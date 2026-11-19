@@ -1,5 +1,5 @@
-// Modular View Renderers v4.0 — Mobile-First, Thmanyah Sans, Motion Graphics,
-// Full-Access Agentic AI + Receipt Vision + Unlimited What-If & Custom Savings
+// Modular View Renderers v5.0 — Full Motion-Graphics Scroll Choreography & Mobile Polish
+// Strictly Real User Data, Zero Demo Placeholders
 
 import { icon } from './icons.js';
 import {
@@ -38,7 +38,7 @@ function txRowHtml(tx, accounts, cur, showActions = false) {
     <div class="list-row">
       <div class="row-lead">
         <div class="row-icon ${cls}">${icon(iconName, 16)}</div>
-        <div style="min-width:0;">
+        <div style="min-width:0;flex:1;">
           <div class="row-title">${esc(tx.note || tx.category)}</div>
           <div class="row-meta">
             <span>${esc(tx.category)}</span>
@@ -52,8 +52,8 @@ function txRowHtml(tx, accounts, cur, showActions = false) {
       <div class="row-end">
         <span class="num amount-${cls}" style="font-size:13.5px;">${sign}${formatMoney(tx.amount, cur)}</span>
         ${showActions ? `
-          <button class="btn-icon" style="width:32px;height:32px;" data-action="edit-tx" data-id="${tx.id}" aria-label="تعديل المعاملة">${icon('edit', 14)}</button>
-          <button class="btn-icon" style="width:32px;height:32px;" data-action="delete-tx" data-id="${tx.id}" aria-label="حذف المعاملة">${icon('trash', 14)}</button>
+          <button class="btn-icon" style="width:30px;height:30px;" data-action="edit-tx" data-id="${tx.id}" aria-label="تعديل المعاملة">${icon('edit', 13)}</button>
+          <button class="btn-icon" style="width:30px;height:30px;" data-action="delete-tx" data-id="${tx.id}" aria-label="حذف المعاملة">${icon('trash', 13)}</button>
         ` : ''}
       </div>
     </div>
@@ -61,7 +61,7 @@ function txRowHtml(tx, accounts, cur, showActions = false) {
 }
 
 // =========================================================================
-// 1. OVERVIEW DASHBOARD
+// 1. OVERVIEW DASHBOARD (Scroll-Choreographed Motion Graphics)
 // =========================================================================
 export function renderDashboardView(activeMonth) {
   const state = getState();
@@ -74,10 +74,11 @@ export function renderDashboardView(activeMonth) {
   const topInsight = plan.insights[0];
 
   return `
-    <!-- Living Motion-Graphic Hero Card -->
-    <section class="hero-card stagger-in" style="--i:0;" aria-label="ملخص الرصيد">
+    <!-- Living 2.5D Scroll-Parallax Hero Card with Specular Sheen -->
+    <section id="hero-parallax-card" class="hero-card" data-reveal="scale" aria-label="ملخص الرصيد">
       <div class="hero-orb hero-orb-1" aria-hidden="true"></div>
       <div class="hero-orb hero-orb-2" aria-hidden="true"></div>
+      <div class="hero-sheen" aria-hidden="true"></div>
       <div class="hero-inner">
         <div class="hero-top-row">
           <span class="hero-label">إجمالي أرصدتك الحالية</span>
@@ -104,7 +105,7 @@ export function renderDashboardView(activeMonth) {
     </section>
 
     <!-- 4-Button Spring Quick Action Dock -->
-    <section class="action-dock stagger-in" style="--i:1;" aria-label="إجراءات سريعة">
+    <section class="action-dock" data-reveal="up" aria-label="إجراءات سريعة">
       <button class="dock-btn" data-action="open-modal" data-modal="expense">
         <span class="dock-icon expense">${icon('arrowUp', 18)}</span>
         <span>مصروف</span>
@@ -124,35 +125,42 @@ export function renderDashboardView(activeMonth) {
       </button>
     </section>
 
-    <!-- 2-Second Quick Expense Card -->
-    <form id="quick-add-form" class="quick-add-card stagger-in" style="--i:2;" aria-label="تسجيل مصروف سريع">
-      <div style="display:flex;align-items:center;justify-content:space-between;">
+    <!-- Clean Quick-Access Pill Strip (Unclutters Topbar) -->
+    <nav class="pill-strip" data-reveal="slide" aria-label="أقسام إضافية">
+      <button class="pill-nav-btn" data-nav="budgets">${icon('pie', 14)} الميزانيات والالتزامات</button>
+      <button class="pill-nav-btn" data-nav="goals">${icon('target', 14)} الأهداف والديون</button>
+      <button class="pill-nav-btn" data-action="open-modal" data-modal="transfer">${icon('repeat', 14)} تحويل بين حسابين</button>
+    </nav>
+
+    <!-- Sleek Compact 1-Row Quick Expense Card -->
+    <form id="quick-add-form" class="quick-add-card" data-reveal="up" aria-label="تسجيل مصروف سريع">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
         <span style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--accent-primary);">
-          ${icon('zap', 15)} تسجيل مصروف سريع
+          ${icon('zap', 15)} مصروف سريع
         </span>
         ${plan.allocation.baseIncome > 0 && plan.daysLeft > 0
           ? `<span class="badge badge-accent num">الحد اليومي: ${formatMoney(plan.safeDailySpend, cur)}</span>`
           : ''}
       </div>
-      <div class="quick-add-row">
+      <div class="quick-add-inline">
         <input id="qa-amount" class="form-input num" type="number" inputmode="decimal" min="0.01" step="any" required placeholder="المبلغ">
         <select id="qa-cat" class="form-select">
           ${expCats.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join('')}
         </select>
+        <button type="submit" class="btn btn-primary" style="padding:0 14px;" aria-label="حفظ">${icon('plus', 18)}</button>
       </div>
       <div class="quick-add-row">
         ${state.accounts.length > 0 ? `
-          <select id="qa-acc" class="form-select">
+          <select id="qa-acc" class="form-select" style="min-height:38px;font-size:12.5px;">
             ${state.accounts.map((a) => `<option value="${a.id}">${esc(a.name)}</option>`).join('')}
           </select>
-        ` : `<input class="form-input" disabled value="بدون حساب مرتبط">`}
-        <input id="qa-note" class="form-input" type="text" placeholder="ملاحظة (اختياري)">
+        ` : `<input class="form-input" style="min-height:38px;font-size:12.5px;" disabled value="بدون حساب">`}
+        <input id="qa-note" class="form-input" style="min-height:38px;font-size:12.5px;" type="text" placeholder="ملاحظة (اختياري)">
       </div>
-      <button type="submit" class="btn btn-primary" style="width:100%;">${icon('plus', 16)} حفظ المصروف الآن</button>
     </form>
 
     <!-- Horizontal Swipeable Accounts Strip -->
-    <section class="stagger-in" style="--i:3;">
+    <section data-reveal="slide">
       <div class="card-header" style="margin-bottom:8px;">
         <h2 class="card-title">${icon('wallet', 16)} حساباتك ومحافظك</h2>
         <button class="btn btn-ghost" data-nav="accounts">إدارة الكل</button>
@@ -185,9 +193,9 @@ export function renderDashboardView(activeMonth) {
       `}
     </section>
 
-    <!-- Smart AI Insight Banner -->
+    <!-- Smart AI Insight Banner (Scroll Clip Reveal) -->
     ${topInsight ? `
-      <section class="ai-banner stagger-in" style="--i:4;">
+      <section class="ai-banner" data-reveal="clip">
         <div style="display:flex;gap:11px;align-items:flex-start;">
           <div class="row-icon pulse-glow" style="background:var(--accent-primary);color:#fff;">${icon('sparkles', 17)}</div>
           <div style="min-width:0;">
@@ -200,7 +208,7 @@ export function renderDashboardView(activeMonth) {
     ` : ''}
 
     <!-- Recent Month Transactions -->
-    <section class="card stagger-in" style="--i:5;">
+    <section class="card" data-reveal="up">
       <div class="card-header">
         <div>
           <h2 class="card-title">آخر معاملات ${esc(formatMonthAr(activeMonth))}</h2>
@@ -217,8 +225,8 @@ export function renderDashboardView(activeMonth) {
       ` : monthTxs.map((t) => txRowHtml(t, state.accounts, cur, false)).join('')}
     </section>
 
-    <!-- Animated Expense Distribution -->
-    <section class="card stagger-in" style="--i:6;">
+    <!-- Scroll-Triggered Animated Expense Distribution -->
+    <section class="card" data-reveal="scale">
       <div class="card-header">
         <h2 class="card-title">توزيع مصاريف الشهر</h2>
         <button class="btn btn-ghost" data-nav="analytics">التقارير</button>
@@ -226,8 +234,8 @@ export function renderDashboardView(activeMonth) {
       ${renderDonutChart(s.byCategory, cur)}
     </section>
 
-    <!-- Budgets Preview -->
-    <section class="card stagger-in" style="--i:7;">
+    <!-- Scroll-Triggered Budgets Preview -->
+    <section class="card" data-reveal="up">
       <div class="card-header">
         <h2 class="card-title">الميزانيات الشهرية</h2>
         <button class="btn btn-ghost" data-nav="budgets">ضبط الكل</button>
@@ -250,7 +258,7 @@ export function renderDashboardView(activeMonth) {
               <span style="font-weight:600;">${esc(b.category)}</span>
               <span class="num">${formatMoney(spent, cur)} / ${formatMoney(b.limit, cur)}</span>
             </div>
-            <div class="progress-track"><div class="progress-fill ${status}" style="width:${pct}%"></div></div>
+            <div class="progress-track"><div class="progress-fill ${status}" data-fill="${pct}"></div></div>
           </div>
         `;
       }).join('')}
@@ -281,7 +289,7 @@ export function renderTransactionsView(filters) {
   const sumOut = list.filter((t) => t.type === 'expense').reduce((a, b) => a + b.amount, 0);
 
   return `
-    <header class="page-header stagger-in" style="--i:0;">
+    <header class="page-header" data-reveal="up">
       <div>
         <h1 class="page-title">المعاملات المالية</h1>
         <p class="page-subtitle">سجّل وعدّل وابحث في كل عملياتك</p>
@@ -292,7 +300,7 @@ export function renderTransactionsView(filters) {
       </div>
     </header>
 
-    <section class="card stagger-in" style="--i:1;">
+    <section class="card" data-reveal="up">
       <div class="filter-bar">
         <input type="search" class="form-input span-2" id="flt-q" placeholder="بحث بالملاحظة أو الفئة..." value="${esc(filters.q)}">
         <select class="form-select" id="flt-type">
@@ -310,11 +318,11 @@ export function renderTransactionsView(filters) {
 
       ${list.length > 0 ? `
         <div class="kpi-grid-2" style="margin-bottom:12px;">
-          <div style="padding:10px 12px;background:var(--bg-surface-subtle);border-radius:var(--radius-md);font-size:12px;">
+          <div style="padding:10px 12px;background:var(--bg-surface-subtle);border-radius:14px;font-size:12px;">
             <div style="color:var(--text-muted);">الدخل (${list.length} عملية)</div>
             <div class="num amount-income" style="font-size:14px;margin-top:2px;">+${formatMoney(sumIn, cur)}</div>
           </div>
-          <div style="padding:10px 12px;background:var(--bg-surface-subtle);border-radius:var(--radius-md);font-size:12px;">
+          <div style="padding:10px 12px;background:var(--bg-surface-subtle);border-radius:14px;font-size:12px;">
             <div style="color:var(--text-muted);">المصاريف</div>
             <div class="num amount-expense" style="font-size:14px;margin-top:2px;">-${formatMoney(sumOut, cur)}</div>
           </div>
@@ -342,7 +350,7 @@ export function renderAccountsView() {
   const total = state.accounts.reduce((s, a) => s + (Number(a.balance) || 0), 0);
 
   return `
-    <header class="page-header stagger-in" style="--i:0;">
+    <header class="page-header" data-reveal="up">
       <div>
         <h1 class="page-title">الحسابات والمحافظ</h1>
         <p class="page-subtitle">إجمالي السيولة: <strong class="num">${formatMoney(total, cur)}</strong></p>
@@ -354,7 +362,7 @@ export function renderAccountsView() {
     </header>
 
     ${state.accounts.length === 0 ? `
-      <section class="card stagger-in" style="--i:1;">
+      <section class="card" data-reveal="scale">
         <div class="empty-state">
           <div class="empty-icon">${icon('wallet', 22)}</div>
           <div class="empty-title">ما أضفت أي حساب بعد</div>
@@ -364,10 +372,10 @@ export function renderAccountsView() {
       </section>
     ` : `
       <div class="stack-sm">
-        ${state.accounts.map((acc, idx) => {
+        ${state.accounts.map((acc) => {
           const meta = ACCOUNT_TYPES[acc.type] || ACCOUNT_TYPES.bank;
           return `
-            <article class="card stack-sm stagger-in" style="--i:${idx + 1};">
+            <article class="card stack-sm" data-reveal="up">
               <div style="display:flex;justify-content:space-between;align-items:center;">
                 <div style="display:flex;gap:10px;align-items:center;">
                   <div class="row-icon">${icon(meta.icon, 18)}</div>
@@ -378,7 +386,7 @@ export function renderAccountsView() {
                 </div>
                 <button class="btn-icon" style="width:34px;height:34px;" data-action="delete-account" data-id="${acc.id}" aria-label="حذف الحساب">${icon('trash', 15)}</button>
               </div>
-              <div class="kpi-value num">${formatMoney(acc.balance, cur)}</div>
+              <div class="kpi-value num" data-count="${acc.balance}" data-currency="${esc(cur)}">${formatMoney(acc.balance, cur)}</div>
               ${acc.notes ? `<p style="font-size:12px;color:var(--text-secondary);">${esc(acc.notes)}</p>` : ''}
               <button class="btn btn-secondary btn-sm" style="width:100%;" data-action="adjust-balance" data-id="${acc.id}">تعديل الرصيد</button>
             </article>
@@ -399,7 +407,7 @@ export function renderBudgetsView() {
   const s = getFinancialSummary(mKey);
 
   return `
-    <header class="page-header stagger-in" style="--i:0;">
+    <header class="page-header" data-reveal="up">
       <div>
         <h1 class="page-title">الميزانيات والالتزامات</h1>
         <p class="page-subtitle">سقف الصرف الشهري والفواتير المتكررة</p>
@@ -410,7 +418,7 @@ export function renderBudgetsView() {
       </div>
     </header>
 
-    <section class="card stagger-in" style="--i:1;">
+    <section class="card" data-reveal="up">
       <div class="card-header">
         <div>
           <h2 class="card-title">حدود الميزانيات (${esc(formatMonthAr(mKey))})</h2>
@@ -441,7 +449,7 @@ export function renderBudgetsView() {
               </div>
               <button class="btn-icon" style="width:32px;height:32px;" data-action="delete-budget" data-id="${b.id}" aria-label="حذف الميزانية">${icon('trash', 14)}</button>
             </div>
-            <div class="progress-track" style="margin-bottom:5px;"><div class="progress-fill ${status}" style="width:${pct}%"></div></div>
+            <div class="progress-track" style="margin-bottom:5px;"><div class="progress-fill ${status}" data-fill="${pct}"></div></div>
             <div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--text-secondary);">
               <span class="num">المصروف: ${formatMoney(spent, cur)}</span>
               <span class="num">${remaining >= 0 ? `المتبقي: ${formatMoney(remaining, cur)}` : `تجاوز بـ ${formatMoney(Math.abs(remaining), cur)}`}</span>
@@ -451,7 +459,7 @@ export function renderBudgetsView() {
       }).join('')}
     </section>
 
-    <section class="card stagger-in" style="--i:2;">
+    <section class="card" data-reveal="up">
       <div class="card-header">
         <div>
           <h2 class="card-title">الفواتير والاشتراكات المتكررة</h2>
@@ -499,7 +507,7 @@ export function renderGoalsView() {
   const s = getFinancialSummary();
 
   return `
-    <header class="page-header stagger-in" style="--i:0;">
+    <header class="page-header" data-reveal="up">
       <div>
         <h1 class="page-title">الأهداف والديون</h1>
         <p class="page-subtitle">خطط لمدخراتك وتابع كل مبلغ لك أو عليك</p>
@@ -510,7 +518,7 @@ export function renderGoalsView() {
       </div>
     </header>
 
-    <section class="card stagger-in" style="--i:1;">
+    <section class="card" data-reveal="up">
       <div class="card-header"><h2 class="card-title">الأهداف الادخارية</h2></div>
       ${state.goals.length === 0 ? `
         <div class="empty-state">
@@ -534,7 +542,7 @@ export function renderGoalsView() {
                 <button class="btn-icon" style="width:32px;height:32px;" data-action="delete-goal" data-id="${g.id}" aria-label="حذف">${icon('trash', 14)}</button>
               </div>
             </div>
-            <div class="progress-track" style="margin-bottom:5px;"><div class="progress-fill" style="width:${pct}%"></div></div>
+            <div class="progress-track" style="margin-bottom:5px;"><div class="progress-fill" data-fill="${pct}"></div></div>
             <div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--text-secondary);">
               <span class="num">${formatMoney(g.currentAmount, cur)} / ${formatMoney(g.targetAmount, cur)} (${pct}%)</span>
               <span class="num">${rem === 0 ? 'مكتمل' : `متبقي ${formatMoney(rem, cur)}`}</span>
@@ -544,7 +552,7 @@ export function renderGoalsView() {
       }).join('')}
     </section>
 
-    <section class="card stagger-in" style="--i:2;">
+    <section class="card" data-reveal="up">
       <div class="card-header">
         <div>
           <h2 class="card-title">الديون والالتزامات</h2>
@@ -574,7 +582,7 @@ export function renderGoalsView() {
                 <button class="btn-icon" style="width:32px;height:32px;" data-action="delete-debt" data-id="${d.id}" aria-label="حذف">${icon('trash', 14)}</button>
               </div>
             </div>
-            <div class="progress-track" style="margin-bottom:5px;"><div class="progress-fill" style="width:${pct}%"></div></div>
+            <div class="progress-track" style="margin-bottom:5px;"><div class="progress-fill" data-fill="${pct}"></div></div>
             <div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--text-secondary);">
               <span class="num">المسدد: ${formatMoney(d.paidAmount, cur)}</span>
               <span class="num">المتبقي: ${formatMoney(rem, cur)}</span>
@@ -587,7 +595,7 @@ export function renderGoalsView() {
 }
 
 // =========================================================================
-// 6. ANALYTICS & REPORTS
+// 6. ANALYTICS & REPORTS (Scroll-Triggered Animated Charts)
 // =========================================================================
 export function renderAnalyticsView(activeMonth) {
   const state = getState();
@@ -596,7 +604,7 @@ export function renderAnalyticsView(activeMonth) {
   const s = plan.summary;
 
   return `
-    <header class="page-header stagger-in" style="--i:0;">
+    <header class="page-header" data-reveal="up">
       <div>
         <h1 class="page-title">التحليلات والتقارير</h1>
         <p class="page-subtitle">قراءة بصرية لتدفقاتك المالية</p>
@@ -604,7 +612,7 @@ export function renderAnalyticsView(activeMonth) {
       ${monthSwitcherHtml(activeMonth, true)}
     </header>
 
-    <section class="kpi-grid-2 stagger-in" style="--i:1;">
+    <section class="kpi-grid-2" data-reveal="scale">
       <div class="kpi-card">
         <span class="kpi-label">الصحة المالية</span>
         <div class="kpi-value num">${plan.score !== null ? `${plan.score} / 100` : '—'}</div>
@@ -627,7 +635,7 @@ export function renderAnalyticsView(activeMonth) {
       </div>
     </section>
 
-    <section class="card stagger-in" style="--i:2;">
+    <section class="card" data-reveal="clip">
       <div class="card-header">
         <div>
           <h2 class="card-title">منحنى الصرف اليومي</h2>
@@ -637,12 +645,12 @@ export function renderAnalyticsView(activeMonth) {
       ${renderDailySpendChart(s.byDay, activeMonth, cur)}
     </section>
 
-    <section class="card stagger-in" style="--i:3;">
+    <section class="card" data-reveal="scale">
       <div class="card-header"><h2 class="card-title">توزيع مصاريف الشهر</h2></div>
       ${renderDonutChart(s.byCategory, cur)}
     </section>
 
-    <section class="card stagger-in" style="--i:4;">
+    <section class="card" data-reveal="up">
       <div class="card-header"><h2 class="card-title">الدخل والمصاريف (آخر 6 أشهر)</h2></div>
       ${renderCashflowBarChart(state.transactions, cur)}
     </section>
@@ -666,14 +674,12 @@ export function renderAdvisorView(simState) {
     'كم زكاتي التقديرية؟'
   ];
 
-  // 1) Unlimited What-If Expense Cut Simulator (0% to 100% — no 40% cap)
   const baseExpense = plan.summary.monthExpense > 0 ? plan.summary.monthExpense : plan.allocation.wants;
   const cutPct = Math.max(0, Math.min(100, Number(simState.cutPct) || 0));
   const monthlySaved = Math.round((baseExpense * cutPct) / 100) + Math.max(0, plan.allocation.savings);
   const yearlySaved = monthlySaved * 12;
   const threeYearSaved = monthlySaved * 36;
 
-  // 2) Dedicated "لو ادخرت" Custom Savings Calculator
   const customAmt = Math.max(0, Number(simState.customSaveAmount) || 0);
   const customFreq = simState.customSaveFreq || 'daily';
   const multToMonth = customFreq === 'daily' ? 30 : customFreq === 'weekly' ? 4.333 : 1;
@@ -683,10 +689,10 @@ export function renderAdvisorView(simState) {
   const c5Yr = Math.round(cMonth * 60);
 
   return `
-    <header class="page-header stagger-in" style="--i:0;">
+    <header class="page-header" data-reveal="up">
       <div>
         <h1 class="page-title">المستشار الذكي</h1>
-        <p class="page-subtitle">تحكم كامل بالتطبيق + قراءة الفواتير بالصور + ماذا لو</p>
+        <p class="page-subtitle">تحكم كامل بالتطبيق + قراءة الفواتير + ماذا لو</p>
       </div>
       <span class="badge ${hasKey ? 'badge-income' : 'badge-accent'}">
         ${icon('sparkles', 13)} ${hasKey ? 'Gemini AI متصل' : 'المحرك المحلي نشط'}
@@ -694,7 +700,7 @@ export function renderAdvisorView(simState) {
     </header>
 
     <!-- Quick Gemini API Connect / Test Card -->
-    <section class="card stack-sm stagger-in" style="--i:1;">
+    <section class="card stack-sm" data-reveal="scale">
       ${hasKey ? `
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
           <div style="display:flex;align-items:center;gap:10px;">
@@ -721,7 +727,7 @@ export function renderAdvisorView(simState) {
     </section>
 
     <!-- Full-Access Agentic Chat + Receipt Vision Camera -->
-    <section class="card stagger-in" style="--i:2;">
+    <section class="card" data-reveal="up">
       <div class="card-header">
         <div>
           <h2 class="card-title">${icon('receipt', 16)} محادثة وأوامر المستشار</h2>
@@ -755,8 +761,8 @@ export function renderAdvisorView(simState) {
       </div>
     </section>
 
-    <!-- Dedicated "لو ادخرت" Calculator (Any Amount: Daily / Weekly / Monthly) -->
-    <section class="card stack-sm stagger-in" style="--i:3;">
+    <!-- Dedicated "لو ادخرت" Calculator -->
+    <section class="card stack-sm" data-reveal="clip">
       <div class="card-header" style="margin-bottom:2px;">
         <div>
           <h2 class="card-title">${icon('target', 16)} حاسبة «لو ادخرت»</h2>
@@ -774,19 +780,19 @@ export function renderAdvisorView(simState) {
       </div>
 
       <div class="kpi-grid-2">
-        <div style="padding:11px;border-radius:var(--radius-md);background:var(--bg-surface-subtle);">
+        <div style="padding:11px;border-radius:14px;background:var(--bg-surface-subtle);">
           <div style="font-size:11px;color:var(--text-muted);">في الشهر</div>
           <div class="num" style="font-size:16px;font-weight:700;margin-top:2px;" id="cs-month">${formatMoney(cMonth, cur)}</div>
         </div>
-        <div style="padding:11px;border-radius:var(--radius-md);background:var(--bg-surface-subtle);">
+        <div style="padding:11px;border-radius:14px;background:var(--bg-surface-subtle);">
           <div style="font-size:11px;color:var(--text-muted);">في السنة (12 شهر)</div>
           <div class="num amount-income" style="font-size:16px;font-weight:700;margin-top:2px;" id="cs-year">${formatMoney(cYear, cur)}</div>
         </div>
-        <div style="padding:11px;border-radius:var(--radius-md);background:var(--bg-surface-subtle);">
+        <div style="padding:11px;border-radius:14px;background:var(--bg-surface-subtle);">
           <div style="font-size:11px;color:var(--text-muted);">في 3 سنوات</div>
           <div class="num" style="font-size:16px;font-weight:700;margin-top:2px;" id="cs-3yr">${formatMoney(c3Yr, cur)}</div>
         </div>
-        <div style="padding:11px;border-radius:var(--radius-md);background:var(--accent-primary-soft);border:1px solid var(--accent-primary-border);">
+        <div style="padding:11px;border-radius:14px;background:var(--accent-primary-soft);border:1px solid var(--accent-primary-border);">
           <div style="font-size:11px;color:var(--accent-primary);font-weight:600;">في 5 سنوات</div>
           <div class="num" style="font-size:16px;font-weight:700;color:var(--accent-primary);margin-top:2px;" id="cs-5yr">${formatMoney(c5Yr, cur)}</div>
         </div>
@@ -794,30 +800,30 @@ export function renderAdvisorView(simState) {
     </section>
 
     <!-- Unlimited What-If Expense Cut Simulator (0% to 100%) -->
-    <section class="card stack-sm stagger-in" style="--i:4;">
+    <section class="card stack-sm" data-reveal="up">
       <div class="card-header" style="margin-bottom:2px;">
         <div>
           <h2 class="card-title">${icon('sliders', 16)} محاكي «ماذا لو خفضت مصاريفك؟»</h2>
           <p class="card-subtitle">اختر أي نسبة بدون حد (من 0% حتى 100%)</p>
         </div>
         <div style="display:flex;align-items:center;gap:4px;">
-          <input id="sim-cut-input" class="form-input num" type="number" min="0" max="100" value="${cutPct}" style="width:68px;min-height:34px;padding:4px 8px;text-align:center;font-weight:700;">
+          <input id="sim-cut-input" class="form-input num" type="number" min="0" max="100" value="${cutPct}" style="width:66px;min-height:34px;padding:4px 8px;text-align:center;font-weight:700;">
           <span style="font-size:13px;font-weight:700;">%</span>
         </div>
       </div>
       ${baseExpense > 0 || plan.allocation.savings > 0 ? `
         <input id="sim-cut-range" class="sim-range" type="range" min="0" max="100" step="1" value="${cutPct}">
         <div class="kpi-grid-2" style="margin-top:4px;">
-          <div style="padding:11px;border-radius:var(--radius-md);background:var(--bg-surface-subtle);">
+          <div style="padding:11px;border-radius:14px;background:var(--bg-surface-subtle);">
             <div style="font-size:11px;color:var(--text-muted);">الادخار الشهري</div>
             <div class="num" style="font-size:16px;font-weight:700;margin-top:2px;" id="sim-monthly">${formatMoney(monthlySaved, cur)}</div>
           </div>
-          <div style="padding:11px;border-radius:var(--radius-md);background:var(--bg-surface-subtle);">
+          <div style="padding:11px;border-radius:14px;background:var(--bg-surface-subtle);">
             <div style="font-size:11px;color:var(--text-muted);">خلال سنة (12 شهر)</div>
             <div class="num amount-income" style="font-size:16px;font-weight:700;margin-top:2px;" id="sim-yearly">${formatMoney(yearlySaved, cur)}</div>
           </div>
         </div>
-        <div style="padding:12px;border-radius:var(--radius-md);background:var(--accent-primary-soft);border:1px solid var(--accent-primary-border);display:flex;justify-content:space-between;align-items:center;">
+        <div style="padding:12px;border-radius:14px;background:var(--accent-primary-soft);border:1px solid var(--accent-primary-border);display:flex;justify-content:space-between;align-items:center;">
           <span style="font-size:12.5px;color:var(--accent-primary);font-weight:700;">المتوقع خلال 3 سنوات</span>
           <span class="num" style="font-size:18px;font-weight:700;color:var(--accent-primary);" id="sim-3yr">${formatMoney(threeYearSaved, cur)}</span>
         </div>
@@ -827,7 +833,7 @@ export function renderAdvisorView(simState) {
     </section>
 
     <!-- Monthly Plan & Insights -->
-    <section class="card stack-sm stagger-in" style="--i:5;">
+    <section class="card stack-sm" data-reveal="up">
       <div class="card-header" style="margin-bottom:2px;">
         <div>
           <h2 class="card-title">${icon('sparkles', 16)} خطتك الشهرية المقترحة</h2>
@@ -837,16 +843,16 @@ export function renderAdvisorView(simState) {
 
       ${plan.allocation.baseIncome > 0 ? `
         <div class="kpi-grid-2">
-          <div style="padding:11px;border-radius:var(--radius-md);background:var(--bg-surface-subtle);">
+          <div style="padding:11px;border-radius:14px;background:var(--bg-surface-subtle);">
             <div style="font-size:11px;color:var(--text-muted);">الأساسيات</div>
             <div class="num" style="font-size:16px;font-weight:700;margin-top:2px;">${formatMoney(plan.allocation.needs, cur)}</div>
           </div>
-          <div style="padding:11px;border-radius:var(--radius-md);background:var(--bg-surface-subtle);">
+          <div style="padding:11px;border-radius:14px;background:var(--bg-surface-subtle);">
             <div style="font-size:11px;color:var(--text-muted);">المصاريف المرنة</div>
             <div class="num" style="font-size:16px;font-weight:700;margin-top:2px;">${formatMoney(plan.allocation.wants, cur)}</div>
           </div>
         </div>
-        <div style="padding:12px;border-radius:var(--radius-md);background:var(--accent-primary-soft);border:1px solid var(--accent-primary-border);display:flex;justify-content:space-between;align-items:center;">
+        <div style="padding:12px;border-radius:14px;background:var(--accent-primary-soft);border:1px solid var(--accent-primary-border);display:flex;justify-content:space-between;align-items:center;">
           <span style="font-size:12.5px;color:var(--accent-primary);font-weight:700;">المخصص للادخار والأهداف</span>
           <span class="num" style="font-size:17px;font-weight:700;color:var(--accent-primary);">${formatMoney(plan.allocation.savings, cur)}</span>
         </div>
@@ -859,7 +865,7 @@ export function renderAdvisorView(simState) {
 
       <div class="stack-sm" style="margin-top:4px;">
         ${plan.insights.map((ins) => `
-          <div style="padding:12px;border-radius:var(--radius-md);border:1px solid var(--border-subtle);background:var(--bg-surface);">
+          <div style="padding:12px;border-radius:14px;border:1px solid var(--border-subtle);background:var(--bg-surface);">
             <div style="font-weight:700;font-size:13.5px;margin-bottom:3px;">${esc(ins.title)}</div>
             <div style="font-size:12.5px;color:var(--text-secondary);line-height:1.55;">${esc(ins.body)}</div>
           </div>
@@ -879,14 +885,14 @@ export function renderSettingsView() {
   const customInc = state.customCategories?.income || [];
 
   return `
-    <header class="page-header stagger-in" style="--i:0;">
+    <header class="page-header" data-reveal="up">
       <div>
         <h1 class="page-title">الإعدادات والبيانات</h1>
         <p class="page-subtitle">ملفك الشخصي، الذكاء الاصطناعي، والنسخ الاحتياطي</p>
       </div>
     </header>
 
-    <section class="card stagger-in" style="--i:1;">
+    <section class="card" data-reveal="up">
       <div class="card-header"><h2 class="card-title">الملف الشخصي والاستبيان</h2></div>
       <form id="settings-profile-form" class="stack-sm">
         <div class="form-group">
@@ -926,7 +932,7 @@ export function renderSettingsView() {
       </form>
     </section>
 
-    <section class="card stack-sm stagger-in" style="--i:2;">
+    <section class="card stack-sm" data-reveal="up">
       <div class="card-header" style="margin-bottom:2px;"><h2 class="card-title">فئاتك المخصصة</h2></div>
       <form id="custom-cat-form" style="display:flex;gap:8px;">
         <select id="cc-type" class="form-select" style="width:95px;flex-shrink:0;">
@@ -946,7 +952,7 @@ export function renderSettingsView() {
       `}
     </section>
 
-    <section class="card stack-sm stagger-in" style="--i:3;">
+    <section class="card stack-sm" data-reveal="up">
       <div class="card-header" style="margin-bottom:2px;"><h2 class="card-title">المظهر والخصوصية والنسخ الاحتياطي</h2></div>
       <div class="kpi-grid-2">
         <button class="btn btn-secondary btn-sm" data-action="toggle-theme">${icon(p.theme === 'dark' ? 'sun' : 'moon', 15)} ${p.theme === 'dark' ? 'فاتح' : 'داكن'}</button>
@@ -959,12 +965,12 @@ export function renderSettingsView() {
       </div>
     </section>
 
-    <section class="card stack-sm stagger-in" style="--i:4;">
+    <section class="card stack-sm" data-reveal="up">
       <div class="card-header" style="margin-bottom:2px;"><h2 class="card-title">${icon('tablet', 16)} تثبيت ميزان على الجوال</h2></div>
       <p style="font-size:12.5px;color:var(--text-secondary);line-height:1.6;">في <strong>آيفون (Safari)</strong>: اضغط زر المشاركة بالأسفل ← اختر <strong>إضافة إلى الشاشة الرئيسية</strong>.<br>في <strong>أندرويد (Chrome)</strong>: اضغط القائمة ⋮ ← اختر <strong>تثبيت التطبيق</strong>.</p>
     </section>
 
-    <section class="card stack-sm stagger-in" style="--i:5;border-color:rgba(180,35,24,0.28);">
+    <section class="card stack-sm" data-reveal="up" style="border-color:rgba(180,35,24,0.28);">
       <div class="card-header" style="margin-bottom:2px;"><h2 class="card-title" style="color:var(--color-expense);">${icon('alert', 16)} تصفير البيانات</h2></div>
       <p style="font-size:12.5px;color:var(--text-secondary);">حذف جميع الحسابات والمعاملات وإعادة بدء الاستبيان من الصفر.</p>
       <button class="btn btn-danger btn-sm" style="align-self:flex-start;" data-action="reset-all">${icon('trash', 14)} مسح كل البيانات</button>

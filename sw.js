@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mizan-finance-v4.0.0';
+const CACHE_NAME = 'mizan-finance-v5.0.0';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -13,6 +13,7 @@ const CORE_ASSETS = [
   './css/base.css',
   './css/components.css',
   './js/app.js',
+  './js/motion.js',
   './js/store.js',
   './js/utils.js',
   './js/icons.js',

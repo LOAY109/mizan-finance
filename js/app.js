@@ -1,4 +1,4 @@
-// Mizan Finance v4.0 — Mobile-First Controller, Agentic AI, Receipt Vision & Magic Key Activation
+// Mizan Finance v5.0 — Mobile-First Motion-Graphics Controller
 
 import { icon } from './icons.js';
 import {
@@ -34,6 +34,7 @@ import {
   generateFinancialPlan,
   testGeminiConnection
 } from './ai-engine.js';
+import { initMotionEngine } from './motion.js';
 
 let currentRoute = 'dashboard';
 let activeMonth = currentMonthKey();
@@ -49,7 +50,6 @@ const BOTTOM_TABS = [
 ];
 
 // Magic 1-Tap Private Activation via URL Hash (#key=AIza...)
-// Saves privately to device localStorage and immediately clears hash from browser address bar
 function ingestMagicKeyFromHash() {
   const hash = window.location.hash || '';
   const match = hash.match(/key=([^&]+)/);
@@ -69,30 +69,9 @@ function applyVisualModes(profile) {
   document.documentElement.setAttribute('data-theme', profile.theme === 'dark' ? 'dark' : 'light');
   document.body.classList.toggle('privacy-blur', Boolean(profile.privacyMode));
   const meta = document.getElementById('meta-theme-color');
-  if (meta) meta.setAttribute('content', profile.theme === 'dark' ? '#0C0F12' : '#F6F5F1');
+  if (meta) meta.setAttribute('content', profile.theme === 'dark' ? '#0B0E11' : '#F5F4F0');
 }
 
-function animateNumbers(privacyMode) {
-  if (privacyMode) return;
-  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  document.querySelectorAll('[data-count]').forEach((el) => {
-    const target = Number(el.dataset.count);
-    const cur = el.dataset.currency || 'SAR';
-    if (!Number.isFinite(target) || target === 0) return;
-    const duration = 520;
-    const start = performance.now();
-    const tick = (now) => {
-      const p = Math.min(1, (now - start) / duration);
-      const eased = 1 - Math.pow(1 - p, 3);
-      el.textContent = formatMoney(target * eased, cur);
-      if (p < 1) requestAnimationFrame(tick);
-      else el.textContent = formatMoney(target, cur);
-    };
-    requestAnimationFrame(tick);
-  });
-}
-
-// Client-side Receipt Image Compression (Fast Mobile Upload to Gemini Vision)
 function compressReceiptImage(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -155,6 +134,7 @@ function renderApp() {
       activeMonth = currentMonthKey();
       renderApp();
     });
+    initMotionEngine();
     return;
   }
 
@@ -171,14 +151,20 @@ function renderApp() {
   }
 
   const priv = Boolean(state.profile.privacyMode);
+  const isDark = state.profile.theme === 'dark';
 
   const app = document.getElementById('app');
   app.innerHTML = `
+    <div class="ambient-bg" aria-hidden="true">
+      <div class="ambient-blob ambient-blob-1"></div>
+      <div class="ambient-blob ambient-blob-2"></div>
+    </div>
+
     <div class="mobile-frame">
       <header class="topbar">
         <button class="topbar-brand" data-nav="dashboard" style="text-align:start;">
           <span class="brand-mark">${icon('scale', 18)}</span>
-          <span>
+          <span style="min-width:0;">
             <span class="topbar-title" style="display:block;">ميزان</span>
             <span class="topbar-sub" style="display:block;">أهلاً ${esc(state.profile.name)}</span>
           </span>
@@ -186,31 +172,35 @@ function renderApp() {
 
         <div class="topbar-actions">
           <button class="btn-icon ${priv ? 'active' : ''}" data-action="toggle-privacy" aria-label="وضع الخصوصية">${icon(priv ? 'eyeOff' : 'eye', 17)}</button>
-          <button class="btn-icon ${currentRoute === 'budgets' ? 'active' : ''}" data-nav="budgets" aria-label="الميزانيات">${icon('pie', 17)}</button>
-          <button class="btn-icon ${currentRoute === 'goals' ? 'active' : ''}" data-nav="goals" aria-label="الأهداف والديون">${icon('target', 17)}</button>
+          <button class="btn-icon" data-action="toggle-theme" aria-label="تبديل المظهر">${icon(isDark ? 'sun' : 'moon', 17)}</button>
           <button class="btn-icon ${currentRoute === 'settings' ? 'active' : ''}" data-nav="settings" aria-label="الإعدادات">${icon('settings', 17)}</button>
+        </div>
+
+        <div class="scroll-progress-track" aria-hidden="true">
+          <div id="scroll-progress-bar" class="scroll-progress-bar"></div>
         </div>
       </header>
 
       <main class="main-content">${viewHtml}</main>
 
-      <nav class="bottom-nav" aria-label="التنقل الرئيسي">
-        ${BOTTOM_TABS.map((item) => `
-          <button class="bottom-nav-btn ${currentRoute === item.id ? 'active' : ''}" data-nav="${item.id}">
-            ${icon(item.icon, 20)}
-            <span>${item.label}</span>
-          </button>
-        `).join('')}
-      </nav>
+      <div class="bottom-nav-wrap">
+        <nav class="bottom-nav" aria-label="التنقل الرئيسي">
+          ${BOTTOM_TABS.map((item) => `
+            <button class="bottom-nav-btn ${currentRoute === item.id ? 'active' : ''}" data-nav="${item.id}">
+              ${icon(item.icon, 20)}
+              <span>${item.label}</span>
+            </button>
+          `).join('')}
+        </nav>
+      </div>
     </div>
   `;
 
   bindViewSpecificHandlers();
-  animateNumbers(priv);
+  initMotionEngine();
 }
 
 function bindViewSpecificHandlers() {
-  // Dashboard: Quick-Add + Direct Receipt Camera Button
   if (currentRoute === 'dashboard') {
     const qaForm = document.getElementById('quick-add-form');
     if (qaForm) {
@@ -235,7 +225,6 @@ function bindViewSpecificHandlers() {
     }
   }
 
-  // Transactions filters
   if (currentRoute === 'transactions') {
     const bind = (id, key) => {
       const el = document.getElementById(id);
@@ -255,7 +244,6 @@ function bindViewSpecificHandlers() {
     bind('flt-month', 'month');
   }
 
-  // Advisor: Quick Gemini Key + Chat + Receipt Camera + Unlimited What-If + Custom Savings
   if (currentRoute === 'advisor') {
     const box = document.getElementById('ai-chat-messages');
     if (box) box.scrollTop = box.scrollHeight;
@@ -293,7 +281,6 @@ function bindViewSpecificHandlers() {
       });
     }
 
-    // Unlimited What-If Expense Cut (0% to 100%, synced slider + free numeric input)
     const updateWhatIfUI = (pctVal) => {
       const pct = Math.max(0, Math.min(100, Number(pctVal) || 0));
       simState.cutPct = pct;
@@ -318,7 +305,6 @@ function bindViewSpecificHandlers() {
     document.getElementById('sim-cut-range')?.addEventListener('input', (e) => updateWhatIfUI(e.target.value));
     document.getElementById('sim-cut-input')?.addEventListener('input', (e) => updateWhatIfUI(e.target.value));
 
-    // Dedicated "لو ادخرت" Custom Savings Calculator
     const updateCustomSavingsUI = () => {
       const amt = Math.max(0, Number(document.getElementById('custom-save-amount')?.value) || 0);
       const freq = document.getElementById('custom-save-freq')?.value || 'daily';
@@ -337,7 +323,6 @@ function bindViewSpecificHandlers() {
     document.getElementById('custom-save-freq')?.addEventListener('change', updateCustomSavingsUI);
   }
 
-  // Settings
   if (currentRoute === 'settings') {
     const form = document.getElementById('settings-profile-form');
     if (form) {
