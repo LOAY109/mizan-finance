@@ -1,4 +1,6 @@
-// Dual Smart Financial Intelligence Engine v2.0
+// Dual Smart Financial Intelligence Engine v3.0
+// 1) Local real-time deterministic analysis, smart budget generator & planning (works offline, strictly real user data)
+// 2) Live Gemini API multi-turn advisor chat + connection tester (user's own key stored privately on device)
 
 import { getState, getFinancialSummary, upsertBudget } from './store.js';
 import { formatMoney, currentMonthKey } from './utils.js';
@@ -160,6 +162,7 @@ export function generateFinancialPlan(monthKey = currentMonthKey()) {
   };
 }
 
+// One-tap Smart Budget Generator strictly derived from user's real monthly income
 export function applySmartAutoBudgets() {
   const plan = generateFinancialPlan(currentMonthKey());
   const income = plan.allocation.baseIncome;
@@ -183,6 +186,34 @@ export function applySmartAutoBudgets() {
   });
 
   return { ok: true, count };
+}
+
+// Live Gemini API Connection Test (key stays strictly in device localStorage)
+export async function testGeminiConnection(rawKey) {
+  const apiKey = (rawKey || '').trim();
+  if (!apiKey) {
+    return { ok: false, message: 'أدخل مفتاح Gemini API أولاً' };
+  }
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: 'رد بكلمة واحدة فقط: متصل' }] }]
+        })
+      }
+    );
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      const reason = errData?.error?.message || `HTTP ${res.status}`;
+      return { ok: false, message: `تعذر الاتصال (${reason})` };
+    }
+    return { ok: true, message: 'تم الاتصال بـ Gemini بنجاح وهو جاهز لتحليل بياناتك' };
+  } catch {
+    return { ok: false, message: 'تعذر الوصول للإنترنت حالياً' };
+  }
 }
 
 function answerLocally(question) {

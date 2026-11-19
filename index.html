@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>ميزان — إدارة المصاريف والحسابات الشخصية</title>
-  <meta name="description" content="تطبيق ويب متكامل لإدارة المصاريف، الحسابات، الميزانيات، الأهداف، والخطط المالية الذكية.">
-  <meta name="theme-color" content="#F6F5F1" id="meta-theme-color">
+  <title>ميزان — إدارة المصاريف والحسابات</title>
+  <meta name="description" content="تطبيق ويب للجوال لإدارة المصاريف، الحسابات، الميزانيات، الأهداف، والمستشار المالي الذكي بخط ثمانية.">
+  <meta name="theme-color" content="#F5F4F0" id="meta-theme-color">
 
-  <!-- iPad & iOS PWA Support -->
+  <!-- iOS & Mobile PWA Support -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="ميزان">
@@ -15,10 +15,9 @@
   <link rel="icon" type="image/svg+xml" href="./assets/icon.svg">
   <link rel="manifest" href="./manifest.json">
 
-  <!-- Typography: IBM Plex Sans Arabic -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Self-Hosted Thmanyah Font Preload -->
+  <link rel="preload" href="./assets/fonts/thmanyah-sans-regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="./assets/fonts/thmanyah-sans-bold.woff2" as="font" type="font/woff2" crossorigin>
 
   <!-- Modular Stylesheets -->
   <link rel="stylesheet" href="./css/tokens.css">
@@ -26,16 +25,14 @@
   <link rel="stylesheet" href="./css/components.css">
 </head>
 <body>
-  <div id="app" class="app-root" aria-live="polite">
-    <!-- Rendered dynamically by js/app.js -->
-  </div>
+  <div id="app" class="app-root" aria-live="polite"></div>
 
-  <!-- Global Modal Container -->
+  <!-- Native-style Bottom-Sheet Modal Container -->
   <div id="modal-root" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-hidden="true">
     <div id="modal-container" class="modal-sheet"></div>
   </div>
 
-  <!-- Global Toast Container -->
+  <!-- Animated Toast Stack -->
   <div id="toast-root" class="toast-stack" aria-live="assertive"></div>
 
   <!-- App Entry Point -->

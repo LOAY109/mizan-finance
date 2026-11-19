@@ -1,110 +1,127 @@
 /* ==========================================================================
-   Mizan Finance — Semantic Design Tokens
-   Refined Editorial Minimalism (Light & Architectural Dark)
+   Mizan Finance v3.0 — Thmanyah Typography, Design Tokens & Spring Physics
    ========================================================================== */
+
+@font-face {
+  font-family: 'ThmanyahSans';
+  src: url('../assets/fonts/thmanyah-sans-regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ThmanyahSans';
+  src: url('../assets/fonts/thmanyah-sans-bold.woff2') format('woff2');
+  font-weight: 600 800;
+  font-style: normal;
+  font-display: swap;
+}
 
 :root {
   /* Surfaces */
-  --bg-canvas: #F6F5F1;
+  --bg-canvas: #F5F4F0;
   --bg-surface: #FFFFFF;
-  --bg-surface-subtle: #F0EFE9;
-  --bg-surface-hover: #EAE8E0;
-  --bg-elevated: #FFFFFF;
+  --bg-surface-subtle: #EEEDE7;
+  --bg-surface-hover: #E5E3DB;
+  --bg-glass: rgba(255, 255, 255, 0.80);
 
-  /* Borders & Hairlines */
-  --border-subtle: #E6E4DC;
-  --border-strong: #D2CFC4;
+  /* Hairlines */
+  --border-subtle: rgba(23, 26, 28, 0.08);
+  --border-strong: rgba(23, 26, 28, 0.16);
 
   /* Typography Colors */
-  --text-primary: #171A1C;
-  --text-secondary: #535A60;
-  --text-muted: #7E868C;
+  --text-primary: #14171A;
+  --text-secondary: #525960;
+  --text-muted: #7F8790;
   --text-inverse: #FFFFFF;
 
-  /* Brand Accent — Restrained Deep Emerald-Teal */
-  --accent-primary: #14533C;
-  --accent-primary-hover: #0F422F;
-  --accent-primary-soft: rgba(20, 83, 60, 0.08);
-  --accent-primary-border: rgba(20, 83, 60, 0.22);
+  /* Brand Accent — Deep Editorial Emerald + Warm Gold Glow */
+  --accent-primary: #124E38;
+  --accent-primary-hover: #0D3D2B;
+  --accent-primary-soft: rgba(18, 78, 56, 0.09);
+  --accent-primary-border: rgba(18, 78, 56, 0.22);
+  --accent-gold: #D4A359;
 
   /* Semantic Financial States */
-  --color-income: #166534;
-  --color-income-soft: rgba(22, 101, 52, 0.09);
-  --color-expense: #B42318;
-  --color-expense-soft: rgba(180, 35, 24, 0.09);
+  --color-income: #15803D;
+  --color-income-soft: rgba(21, 128, 61, 0.10);
+  --color-expense: #C0261D;
+  --color-expense-soft: rgba(192, 38, 29, 0.10);
   --color-transfer: #1D4ED8;
-  --color-transfer-soft: rgba(29, 78, 216, 0.09);
+  --color-transfer-soft: rgba(29, 78, 216, 0.10);
   --color-warning: #B45309;
-  --color-warning-soft: rgba(180, 83, 9, 0.10);
+  --color-warning-soft: rgba(180, 83, 9, 0.12);
 
-  /* Typography */
-  --font-sans: 'IBM Plex Sans Arabic', -apple-system, BlinkMacSystemFont, 'SF Pro Arabic', 'Segoe UI', sans-serif;
+  /* Typography — Thmanyah Official Typeface */
+  --font-sans: 'ThmanyahSans', -apple-system, BlinkMacSystemFont, 'SF Pro Arabic', sans-serif;
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;
-  --text-base: 1rem;
+  --text-base: 0.96rem;
   --text-lg: 1.125rem;
-  --text-xl: 1.375rem;
-  --text-2xl: 1.75rem;
-  --text-3xl: 2.25rem;
+  --text-xl: 1.35rem;
+  --text-2xl: 1.7rem;
+  --text-3xl: 2.15rem;
 
   /* Radii */
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 22px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 26px;
   --radius-pill: 9999px;
 
-  /* Shadows */
-  --shadow-xs: 0 1px 2px rgba(23, 26, 28, 0.04);
-  --shadow-sm: 0 2px 8px rgba(23, 26, 28, 0.05);
-  --shadow-md: 0 8px 24px rgba(23, 26, 28, 0.08);
-  --shadow-lg: 0 20px 44px rgba(23, 26, 28, 0.14);
+  /* Physical Shadows */
+  --shadow-xs: 0 1px 2px rgba(18, 22, 24, 0.04);
+  --shadow-sm: 0 4px 14px rgba(18, 22, 24, 0.06);
+  --shadow-md: 0 12px 30px rgba(18, 22, 24, 0.10);
+  --shadow-lg: 0 24px 54px rgba(18, 22, 24, 0.18);
 
-  /* Layout */
-  --sidebar-width: 264px;
-  --bottom-nav-height: 70px;
+  /* Mobile App Frame & Safe Areas */
+  --app-max-width: 460px;
+  --bottom-nav-height: 68px;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --safe-left: env(safe-area-inset-left, 0px);
-  --safe-right: env(safe-area-inset-right, 0px);
 
-  /* Motion */
-  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --dur-fast: 150ms;
-  --dur-base: 240ms;
+  /* Calibrated Spring Physics & Motion Curves */
+  --spring-snappy: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --spring-smooth: cubic-bezier(0.22, 1, 0.36, 1);
+  --spring-exit: cubic-bezier(0.4, 0, 1, 1);
+  --dur-fast: 160ms;
+  --dur-base: 280ms;
+  --dur-slow: 460ms;
 }
 
 [data-theme="dark"] {
-  --bg-canvas: #0E1114;
-  --bg-surface: #151A1F;
-  --bg-surface-subtle: #1C2229;
-  --bg-surface-hover: #232B33;
-  --bg-elevated: #1A2026;
+  --bg-canvas: #0B0E11;
+  --bg-surface: #14191F;
+  --bg-surface-subtle: #1C232B;
+  --bg-surface-hover: #242D37;
+  --bg-glass: rgba(20, 25, 31, 0.82);
 
-  --border-subtle: #252D36;
-  --border-strong: #35404C;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
 
-  --text-primary: #F1F3F5;
-  --text-secondary: #A6B0BA;
-  --text-muted: #76828E;
-  --text-inverse: #0E1114;
+  --text-primary: #F3F5F7;
+  --text-secondary: #A4B0BC;
+  --text-muted: #707C88;
+  --text-inverse: #0B0E11;
 
-  --accent-primary: #2DA374;
-  --accent-primary-hover: #38B985;
-  --accent-primary-soft: rgba(45, 163, 116, 0.13);
-  --accent-primary-border: rgba(45, 163, 116, 0.30);
+  --accent-primary: #27A070;
+  --accent-primary-hover: #31B581;
+  --accent-primary-soft: rgba(39, 160, 112, 0.14);
+  --accent-primary-border: rgba(39, 160, 112, 0.32);
 
   --color-income: #34D399;
-  --color-income-soft: rgba(52, 211, 153, 0.13);
+  --color-income-soft: rgba(52, 211, 153, 0.14);
   --color-expense: #F87171;
-  --color-expense-soft: rgba(248, 113, 113, 0.13);
+  --color-expense-soft: rgba(248, 113, 113, 0.14);
   --color-transfer: #60A5FA;
-  --color-transfer-soft: rgba(96, 165, 250, 0.13);
+  --color-transfer-soft: rgba(96, 165, 250, 0.14);
   --color-warning: #FBBF24;
-  --color-warning-soft: rgba(251, 191, 36, 0.13);
+  --color-warning-soft: rgba(251, 191, 36, 0.14);
 
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.25);
-  --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.30);
-  --shadow-md: 0 10px 28px rgba(0, 0, 0, 0.42);
-  --shadow-lg: 0 22px 48px rgba(0, 0, 0, 0.56);
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.30);
+  --shadow-sm: 0 6px 18px rgba(0, 0, 0, 0.36);
+  --shadow-md: 0 14px 34px rgba(0, 0, 0, 0.48);
+  --shadow-lg: 0 26px 56px rgba(0, 0, 0, 0.65);
 }

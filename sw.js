@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mizan-finance-v2.0.0';
+const CACHE_NAME = 'mizan-finance-v3.0.0';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -7,6 +7,8 @@ const CORE_ASSETS = [
   './assets/icon-192.png',
   './assets/icon-512.png',
   './assets/apple-touch-icon.png',
+  './assets/fonts/thmanyah-sans-regular.woff2',
+  './assets/fonts/thmanyah-sans-bold.woff2',
   './css/tokens.css',
   './css/base.css',
   './css/components.css',

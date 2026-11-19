@@ -1,4 +1,4 @@
-// Mizan Finance v2.0 — Main Application Controller, Native-Style Modals & Router
+// Mizan Finance v3.0 — Mobile-First Controller, Motion Graphics & Native Bottom Sheets
 
 import { icon } from './icons.js';
 import {
@@ -28,29 +28,51 @@ import {
   renderAdvisorView,
   renderSettingsView
 } from './views.js';
-import { askAdvisor, applySmartAutoBudgets, generateFinancialPlan } from './ai-engine.js';
+import {
+  askAdvisor,
+  applySmartAutoBudgets,
+  generateFinancialPlan,
+  testGeminiConnection
+} from './ai-engine.js';
 
 let currentRoute = 'dashboard';
 let activeMonth = currentMonthKey();
 const txFilters = { q: '', type: '', accountId: '', month: '' };
 const simState = { cutPct: 10 };
 
-const NAV_ITEMS = [
-  { id: 'dashboard', label: 'الرئيسية', icon: 'home', mobile: true },
-  { id: 'transactions', label: 'المعاملات', icon: 'arrows', mobile: true },
-  { id: 'accounts', label: 'الحسابات', icon: 'wallet', mobile: true },
-  { id: 'budgets', label: 'الميزانيات', icon: 'pie', mobile: false },
-  { id: 'goals', label: 'الأهداف والديون', icon: 'target', mobile: false },
-  { id: 'analytics', label: 'التحليلات', icon: 'chart', mobile: true },
-  { id: 'advisor', label: 'المستشار الذكي', icon: 'sparkles', mobile: true },
-  { id: 'settings', label: 'الإعدادات', icon: 'settings', mobile: false }
+const BOTTOM_TABS = [
+  { id: 'dashboard', label: 'الرئيسية', icon: 'home' },
+  { id: 'transactions', label: 'المعاملات', icon: 'arrows' },
+  { id: 'accounts', label: 'الحسابات', icon: 'wallet' },
+  { id: 'analytics', label: 'التحليلات', icon: 'chart' },
+  { id: 'advisor', label: 'المستشار', icon: 'sparkles' }
 ];
 
 function applyVisualModes(profile) {
   document.documentElement.setAttribute('data-theme', profile.theme === 'dark' ? 'dark' : 'light');
   document.body.classList.toggle('privacy-blur', Boolean(profile.privacyMode));
   const meta = document.getElementById('meta-theme-color');
-  if (meta) meta.setAttribute('content', profile.theme === 'dark' ? '#0E1114' : '#F6F5F1');
+  if (meta) meta.setAttribute('content', profile.theme === 'dark' ? '#0C0F12' : '#F6F5F1');
+}
+
+function animateNumbers(privacyMode) {
+  if (privacyMode) return;
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  document.querySelectorAll('[data-count]').forEach((el) => {
+    const target = Number(el.dataset.count);
+    const cur = el.dataset.currency || 'SAR';
+    if (!Number.isFinite(target) || target === 0) return;
+    const duration = 520;
+    const start = performance.now();
+    const tick = (now) => {
+      const p = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = formatMoney(target * eased, cur);
+      if (p < 1) requestAnimationFrame(tick);
+      else el.textContent = formatMoney(target, cur);
+    };
+    requestAnimationFrame(tick);
+  });
 }
 
 function renderApp() {
@@ -78,83 +100,47 @@ function renderApp() {
     default:             viewHtml = renderDashboardView(activeMonth);
   }
 
-  const initial = (state.profile.name || 'م').trim().charAt(0);
   const priv = Boolean(state.profile.privacyMode);
 
   const app = document.getElementById('app');
   app.innerHTML = `
-    <div class="mobile-topbar">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div class="brand-mark" style="width:32px;height:32px;">${icon('scale', 17)}</div>
-        <span style="font-weight:700;font-size:16px;">ميزان</span>
-      </div>
-      <div style="display:flex;gap:6px;">
-        <button class="btn-icon ${priv ? 'active' : ''}" style="width:38px;height:38px;" data-action="toggle-privacy" aria-label="وضع الخصوصية">${icon(priv ? 'eyeOff' : 'eye', 17)}</button>
-        <button class="btn-icon" style="width:38px;height:38px;" data-nav="budgets" aria-label="الميزانيات">${icon('pie', 17)}</button>
-        <button class="btn-icon" style="width:38px;height:38px;" data-nav="goals" aria-label="الأهداف والديون">${icon('target', 17)}</button>
-        <button class="btn-icon" style="width:38px;height:38px;" data-nav="settings" aria-label="الإعدادات">${icon('settings', 17)}</button>
-      </div>
-    </div>
+    <div class="mobile-frame">
+      <header class="topbar">
+        <button class="topbar-brand" data-nav="dashboard" style="text-align:start;">
+          <span class="brand-mark">${icon('scale', 18)}</span>
+          <span>
+            <span class="topbar-title" style="display:block;">ميزان</span>
+            <span class="topbar-sub" style="display:block;">أهلاً ${esc(state.profile.name)}</span>
+          </span>
+        </button>
 
-    <div class="app-shell">
-      <aside class="sidebar" aria-label="القائمة الرئيسية">
-        <div class="brand-header">
-          <div class="brand-left">
-            <div class="brand-mark">${icon('scale', 20)}</div>
-            <div>
-              <div class="brand-title">ميزان</div>
-              <div class="brand-subtitle">إدارة مالية ذكية</div>
-            </div>
-          </div>
-          <button class="btn-icon ${priv ? 'active' : ''}" style="width:36px;height:36px;" data-action="toggle-privacy" title="${priv ? 'إظهار الأرقام' : 'إخفاء الأرقام'}" aria-label="وضع الخصوصية">
-            ${icon(priv ? 'eyeOff' : 'eye', 16)}
-          </button>
+        <div class="topbar-actions">
+          <button class="btn-icon ${priv ? 'active' : ''}" data-action="toggle-privacy" aria-label="وضع الخصوصية">${icon(priv ? 'eyeOff' : 'eye', 17)}</button>
+          <button class="btn-icon ${currentRoute === 'budgets' ? 'active' : ''}" data-nav="budgets" aria-label="الميزانيات">${icon('pie', 17)}</button>
+          <button class="btn-icon ${currentRoute === 'goals' ? 'active' : ''}" data-nav="goals" aria-label="الأهداف والديون">${icon('target', 17)}</button>
+          <button class="btn-icon ${currentRoute === 'settings' ? 'active' : ''}" data-nav="settings" aria-label="الإعدادات">${icon('settings', 17)}</button>
         </div>
-
-        <ul class="nav-list">
-          ${NAV_ITEMS.map((item) => `
-            <li>
-              <button class="nav-item ${currentRoute === item.id ? 'active' : ''}" data-nav="${item.id}">
-                ${icon(item.icon, 18)}
-                <span>${item.label}</span>
-              </button>
-            </li>
-          `).join('')}
-        </ul>
-
-        <div class="sidebar-footer">
-          <div class="user-pill">
-            <div class="user-avatar">${esc(initial)}</div>
-            <div style="min-width:0;flex:1;">
-              <div class="user-pill-name">${esc(state.profile.name)}</div>
-              <div class="user-pill-meta">حفظ محلي آمن</div>
-            </div>
-            <button class="btn-icon" style="width:34px;height:34px;" data-action="toggle-theme" aria-label="تبديل المظهر">
-              ${icon(state.profile.theme === 'dark' ? 'sun' : 'moon', 15)}
-            </button>
-          </div>
-        </div>
-      </aside>
+      </header>
 
       <main class="main-content">${viewHtml}</main>
+
+      <nav class="bottom-nav" aria-label="التنقل الرئيسي">
+        ${BOTTOM_TABS.map((item) => `
+          <button class="bottom-nav-btn ${currentRoute === item.id ? 'active' : ''}" data-nav="${item.id}">
+            ${icon(item.icon, 20)}
+            <span>${item.label}</span>
+          </button>
+        `).join('')}
+      </nav>
     </div>
-
-    <button class="fab-add" data-action="open-modal" data-modal="transaction" aria-label="إضافة معاملة سريعة">${icon('plus', 24)}</button>
-
-    <nav class="bottom-nav" aria-label="التنقل السريع">
-      ${NAV_ITEMS.filter((i) => i.mobile).map((item) => `
-        <button class="bottom-nav-btn ${currentRoute === item.id ? 'active' : ''}" data-nav="${item.id}">
-          ${icon(item.icon, 20)}
-          <span>${item.label}</span>
-        </button>
-      `).join('')}
-    </nav>
   `;
 
   bindViewSpecificHandlers();
+  animateNumbers(priv);
 }
 
 function bindViewSpecificHandlers() {
+  // Quick-Add Expense Card on Dashboard
   if (currentRoute === 'dashboard') {
     const qaForm = document.getElementById('quick-add-form');
     if (qaForm) {
@@ -171,6 +157,7 @@ function bindViewSpecificHandlers() {
     }
   }
 
+  // Transactions filters
   if (currentRoute === 'transactions') {
     const bind = (id, key) => {
       const el = document.getElementById(id);
@@ -190,9 +177,23 @@ function bindViewSpecificHandlers() {
     bind('flt-month', 'month');
   }
 
+  // Advisor: Quick Gemini Key + Chat + Live What-If Simulator Slider
   if (currentRoute === 'advisor') {
     const box = document.getElementById('ai-chat-messages');
     if (box) box.scrollTop = box.scrollHeight;
+
+    const quickKeyForm = document.getElementById('quick-gemini-form');
+    if (quickKeyForm) {
+      quickKeyForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const key = (document.getElementById('quick-gemini-key')?.value || '').trim();
+        if (!key) return;
+        updateProfile({ geminiApiKey: key });
+        showToast('تم حفظ المفتاح على جوالك — جاري الاختبار...');
+        const res = await testGeminiConnection(key);
+        showToast(res.message);
+      });
+    }
 
     const form = document.getElementById('ai-chat-form');
     if (form) {
@@ -223,6 +224,7 @@ function bindViewSpecificHandlers() {
     }
   }
 
+  // Settings: Profile + Custom Categories + Import Backup
   if (currentRoute === 'settings') {
     const form = document.getElementById('settings-profile-form');
     if (form) {
@@ -279,10 +281,13 @@ async function handleAdvisorQuestion(q) {
   appendChatMessage('assistant', reply);
 }
 
+// =========================================================================
+// NATIVE iOS-STYLE BOTTOM-SHEET MODALS
+// =========================================================================
 function openModal(html) {
   const root = document.getElementById('modal-root');
   const container = document.getElementById('modal-container');
-  container.innerHTML = html;
+  container.innerHTML = `<div class="sheet-handle" aria-hidden="true"></div>${html}`;
   root.classList.remove('hidden');
   root.setAttribute('aria-hidden', 'false');
 }
@@ -298,9 +303,9 @@ function showConfirmModal({ title, message, confirmLabel = 'تأكيد', danger 
   openModal(`
     <div class="modal-header">
       <h2 class="modal-title">${esc(title)}</h2>
-      <button class="btn-icon" style="width:36px;height:36px;" data-action="close-modal" aria-label="إغلاق">${icon('close', 18)}</button>
+      <button class="btn-icon" style="width:34px;height:34px;" data-action="close-modal" aria-label="إغلاق">${icon('close', 16)}</button>
     </div>
-    <p style="font-size:14px;color:var(--text-secondary);line-height:1.7;">${esc(message)}</p>
+    <p style="font-size:13.5px;color:var(--text-secondary);line-height:1.7;">${esc(message)}</p>
     <div class="modal-footer">
       <button type="button" class="btn btn-secondary" data-action="close-modal">إلغاء</button>
       <button type="button" id="confirm-modal-ok" class="btn ${danger ? 'btn-danger' : 'btn-primary'}">${esc(confirmLabel)}</button>
@@ -316,7 +321,7 @@ function showNumberModal({ title, label, initialValue = '', submitLabel = 'حف�
   openModal(`
     <div class="modal-header">
       <h2 class="modal-title">${esc(title)}</h2>
-      <button class="btn-icon" style="width:36px;height:36px;" data-action="close-modal" aria-label="إغلاق">${icon('close', 18)}</button>
+      <button class="btn-icon" style="width:34px;height:34px;" data-action="close-modal" aria-label="إغلاق">${icon('close', 16)}</button>
     </div>
     <form id="num-modal-form" class="stack-md">
       <div class="form-group">
@@ -354,9 +359,9 @@ function showTransactionModal(defaultType = 'expense', editTx = null) {
     openModal(`
       <div class="modal-header">
         <h2 class="modal-title">${editTx ? 'تعديل المعاملة' : 'إضافة معاملة جديدة'}</h2>
-        <button class="btn-icon" style="width:36px;height:36px;" data-action="close-modal" aria-label="إغلاق">${icon('close', 18)}</button>
+        <button class="btn-icon" style="width:34px;height:34px;" data-action="close-modal" aria-label="إغلاق">${icon('close', 16)}</button>
       </div>
-      <form id="modal-tx-form" class="stack-md">
+      <form id="modal-tx-form" class="stack-sm">
         <div class="segmented">
           <button type="button" class="segmented-btn ${txType === 'expense' ? 'active' : ''}" data-tx-type="expense">مصروف</button>
           <button type="button" class="segmented-btn ${txType === 'income' ? 'active' : ''}" data-tx-type="income">دخل</button>
@@ -405,7 +410,7 @@ function showTransactionModal(defaultType = 'expense', editTx = null) {
 
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-action="close-modal">إلغاء</button>
-          <button type="submit" class="btn btn-primary">${icon('check', 16)} ${editTx ? 'حفظ التعديلات' : 'حفظ المعاملة'}</button>
+          <button type="submit" class="btn btn-primary">${icon('check', 16)} ${editTx ? 'حفظ التعديلات' : 'حفظ'}</button>
         </div>
       </form>
     `);
@@ -452,9 +457,9 @@ function showAccountModal() {
   openModal(`
     <div class="modal-header">
       <h2 class="modal-title">إضافة حساب أو محفظة</h2>
-      <button class="btn-icon" style="width:36px;height:36px;" data-action="close-modal" aria-label="إغلاق">${icon('close', 18)}</button>
+      <button class="btn-icon" style="width:34px;height:34px;" data-action="close-modal" aria-label="إغلاق">${icon('close', 16)}</button>
     </div>
-    <form id="modal-acc-form" class="stack-md">
+    <form id="modal-acc-form" class="stack-sm">
       <div class="form-group">
         <label class="form-label" for="acc-name">اسم الحساب</label>
         <input id="acc-name" class="form-input" type="text" required placeholder="مثلاً: بنك الراجحي، كاش، STC Pay">
@@ -500,9 +505,9 @@ function showBudgetModal() {
   openModal(`
     <div class="modal-header">
       <h2 class="modal-title">تحديد ميزانية شهرية لفئة</h2>
-      <button class="btn-icon" style="width:36px;height:36px;" data-action="close-modal" aria-label="إغلاق">${icon('close', 18)}</button>
+      <button class="btn-icon" style="width:34px;height:34px;" data-action="close-modal" aria-label="إغلاق">${icon('close', 16)}</button>
     </div>
-    <form id="modal-bud-form" class="stack-md">
+    <form id="modal-bud-form" class="stack-sm">
       <div class="form-group">
         <label class="form-label" for="bud-cat">الفئة</label>
         <select id="bud-cat" class="form-select">
@@ -537,12 +542,12 @@ function showRecurringModal() {
   openModal(`
     <div class="modal-header">
       <h2 class="modal-title">إضافة التزام أو اشتراك متكرر</h2>
-      <button class="btn-icon" style="width:36px;height:36px;" data-action="close-modal" aria-label="إغلاق">${icon('close', 18)}</button>
+      <button class="btn-icon" style="width:34px;height:34px;" data-action="close-modal" aria-label="إغلاق">${icon('close', 16)}</button>
     </div>
-    <form id="modal-rec-form" class="stack-md">
+    <form id="modal-rec-form" class="stack-sm">
       <div class="form-group">
         <label class="form-label" for="rec-title">اسم الالتزام</label>
-        <input id="rec-title" class="form-input" type="text" required placeholder="مثال: إيجار، فاتورة إنترنت، اشتراك نادي">
+        <input id="rec-title" class="form-input" type="text" required placeholder="مثال: إيجار، إنترنت، اشتراك نادي">
       </div>
       <div class="form-grid">
         <div class="form-group">
@@ -592,9 +597,9 @@ function showGoalModal() {
   openModal(`
     <div class="modal-header">
       <h2 class="modal-title">إنشاء هدف ادخاري جديد</h2>
-      <button class="btn-icon" style="width:36px;height:36px;" data-action="close-modal" aria-label="إغلاق">${icon('close', 18)}</button>
+      <button class="btn-icon" style="width:34px;height:34px;" data-action="close-modal" aria-label="إغلاق">${icon('close', 16)}</button>
     </div>
-    <form id="modal-goal-form" class="stack-md">
+    <form id="modal-goal-form" class="stack-sm">
       <div class="form-group">
         <label class="form-label" for="g-title">اسم الهدف</label>
         <input id="g-title" class="form-input" type="text" required placeholder="مثال: صندوق طوارئ، سفر، جهاز جديد">
@@ -605,7 +610,7 @@ function showGoalModal() {
           <input id="g-target" class="form-input num" type="number" inputmode="decimal" min="1" step="any" required>
         </div>
         <div class="form-group">
-          <label class="form-label" for="g-current">المبلغ المدخر حالياً</label>
+          <label class="form-label" for="g-current">المدخر حالياً</label>
           <input id="g-current" class="form-input num" type="number" inputmode="decimal" min="0" step="any" value="0">
         </div>
       </div>
@@ -637,19 +642,19 @@ function showDebtModal() {
   openModal(`
     <div class="modal-header">
       <h2 class="modal-title">تسجيل دين أو التزام</h2>
-      <button class="btn-icon" style="width:36px;height:36px;" data-action="close-modal" aria-label="إغلاق">${icon('close', 18)}</button>
+      <button class="btn-icon" style="width:34px;height:34px;" data-action="close-modal" aria-label="إغلاق">${icon('close', 16)}</button>
     </div>
-    <form id="modal-debt-form" class="stack-md">
+    <form id="modal-debt-form" class="stack-sm">
       <div class="form-grid">
         <div class="form-group">
-          <label class="form-label" for="d-person">اسم الشخص أو الجهة</label>
+          <label class="form-label" for="d-person">الاسم أو الجهة</label>
           <input id="d-person" class="form-input" type="text" required placeholder="الاسم">
         </div>
         <div class="form-group">
-          <label class="form-label" for="d-dir">نوع السجل</label>
+          <label class="form-label" for="d-dir">النوع</label>
           <select id="d-dir" class="form-select">
-            <option value="owed_by_me">دين عليك (تحتاج تسدده)</option>
-            <option value="owed_to_me">مبلغ لك عند غيرك</option>
+            <option value="owed_by_me">دين عليك</option>
+            <option value="owed_to_me">مبلغ لك</option>
           </select>
         </div>
       </div>
@@ -659,7 +664,7 @@ function showDebtModal() {
           <input id="d-total" class="form-input num" type="number" inputmode="decimal" min="1" step="any" required>
         </div>
         <div class="form-group">
-          <label class="form-label" for="d-paid">المسدد منه حتى الآن</label>
+          <label class="form-label" for="d-paid">المسدد حتى الآن</label>
           <input id="d-paid" class="form-input num" type="number" inputmode="decimal" min="0" step="any" value="0">
         </div>
       </div>
@@ -683,6 +688,9 @@ function showDebtModal() {
   });
 }
 
+// =========================================================================
+// GLOBAL EVENT DELEGATION
+// =========================================================================
 document.addEventListener('click', async (e) => {
   const navBtn = e.target.closest('[data-nav]');
   if (navBtn) {
@@ -701,13 +709,25 @@ document.addEventListener('click', async (e) => {
     case 'close-modal': closeModal(); break;
     case 'open-modal': {
       const m = actionEl.dataset.modal;
-      if (m === 'transaction') showTransactionModal('expense');
+      if (m === 'transaction' || m === 'expense') showTransactionModal('expense');
+      else if (m === 'income') showTransactionModal('income');
       else if (m === 'transfer') showTransactionModal('transfer');
       else if (m === 'account') showAccountModal();
       else if (m === 'budget') showBudgetModal();
       else if (m === 'recurring') showRecurringModal();
       else if (m === 'goal') showGoalModal();
       else if (m === 'debt') showDebtModal();
+      break;
+    }
+    case 'test-gemini': {
+      const inputKey = document.getElementById('set-apikey')?.value?.trim();
+      const keyToTest = inputKey || (getState().profile.geminiApiKey || '').trim();
+      if (inputKey && inputKey !== getState().profile.geminiApiKey) {
+        updateProfile({ geminiApiKey: inputKey });
+      }
+      showToast('جاري اختبار الاتصال بـ Gemini...');
+      const res = await testGeminiConnection(keyToTest);
+      showToast(res.message);
       break;
     }
     case 'shift-month': {
