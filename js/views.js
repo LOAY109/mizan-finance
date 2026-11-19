@@ -1,5 +1,5 @@
-// Modular View Renderers v3.0 — Mobile-First, Thmanyah Sans & Motion Graphics
-// Strictly Real User Data, Zero Demo Placeholders
+// Modular View Renderers v4.0 — Mobile-First, Thmanyah Sans, Motion Graphics,
+// Full-Access Agentic AI + Receipt Vision + Unlimited What-If & Custom Savings
 
 import { icon } from './icons.js';
 import {
@@ -61,7 +61,7 @@ function txRowHtml(tx, accounts, cur, showActions = false) {
 }
 
 // =========================================================================
-// 1. OVERVIEW DASHBOARD (Mobile-First + Living Motion Graphics)
+// 1. OVERVIEW DASHBOARD
 // =========================================================================
 export function renderDashboardView(activeMonth) {
   const state = getState();
@@ -113,10 +113,11 @@ export function renderDashboardView(activeMonth) {
         <span class="dock-icon income">${icon('arrowDown', 18)}</span>
         <span>دخل</span>
       </button>
-      <button class="dock-btn" data-action="open-modal" data-modal="transfer">
-        <span class="dock-icon transfer">${icon('repeat', 18)}</span>
-        <span>تحويل</span>
-      </button>
+      <label class="dock-btn" style="cursor:pointer;">
+        <span class="dock-icon transfer">${icon('camera', 18)}</span>
+        <span>فاتورة</span>
+        <input type="file" id="dash-receipt-input" accept="image/*" class="hidden">
+      </label>
       <button class="dock-btn" data-nav="advisor">
         <span class="dock-icon ai">${icon('sparkles', 18)}</span>
         <span>المستشار</span>
@@ -211,7 +212,7 @@ export function renderDashboardView(activeMonth) {
         <div class="empty-state">
           <div class="empty-icon">${icon('arrows', 20)}</div>
           <div class="empty-title">لا توجد معاملات في هذا الشهر</div>
-          <p class="empty-desc">ابدأ بأول مصروف أو دخل من الأزرار بالأعلى ليبدأ التحليل التلقائي.</p>
+          <p class="empty-desc">ابدأ بأول مصروف أو صوّر فاتورة من زر «فاتورة» بالأعلى.</p>
         </div>
       ` : monthTxs.map((t) => txRowHtml(t, state.accounts, cur, false)).join('')}
     </section>
@@ -586,7 +587,7 @@ export function renderGoalsView() {
 }
 
 // =========================================================================
-// 6. ANALYTICS & REPORTS (Animated SVG Motion Charts)
+// 6. ANALYTICS & REPORTS
 // =========================================================================
 export function renderAnalyticsView(activeMonth) {
   const state = getState();
@@ -649,7 +650,7 @@ export function renderAnalyticsView(activeMonth) {
 }
 
 // =========================================================================
-// 7. SMART AI ADVISOR, QUICK GEMINI CONNECT & WHAT-IF SIMULATOR
+// 7. FULL-ACCESS AGENTIC AI ADVISOR, RECEIPT SCANNER & UNLIMITED WHAT-IF
 // =========================================================================
 export function renderAdvisorView(simState) {
   const state = getState();
@@ -658,49 +659,58 @@ export function renderAdvisorView(simState) {
   const hasKey = Boolean((state.profile.geminiApiKey || '').trim());
 
   const quickPrompts = [
+    'اليوم دفعت 5 ريال عشان كوفي',
     'حلل مصاريفي هذا الشهر',
-    'قارن مصاريفي بالشهر الماضي',
     'اقترح لي خطة ادخار',
     'كم أقدر أصرف يومياً؟',
-    'كم صندوق الطوارئ المناسب؟',
     'كم زكاتي التقديرية؟'
   ];
 
+  // 1) Unlimited What-If Expense Cut Simulator (0% to 100% — no 40% cap)
   const baseExpense = plan.summary.monthExpense > 0 ? plan.summary.monthExpense : plan.allocation.wants;
-  const cutPct = simState.cutPct;
+  const cutPct = Math.max(0, Math.min(100, Number(simState.cutPct) || 0));
   const monthlySaved = Math.round((baseExpense * cutPct) / 100) + Math.max(0, plan.allocation.savings);
   const yearlySaved = monthlySaved * 12;
   const threeYearSaved = monthlySaved * 36;
+
+  // 2) Dedicated "لو ادخرت" Custom Savings Calculator
+  const customAmt = Math.max(0, Number(simState.customSaveAmount) || 0);
+  const customFreq = simState.customSaveFreq || 'daily';
+  const multToMonth = customFreq === 'daily' ? 30 : customFreq === 'weekly' ? 4.333 : 1;
+  const cMonth = Math.round(customAmt * multToMonth);
+  const cYear = Math.round(cMonth * 12);
+  const c3Yr = Math.round(cMonth * 36);
+  const c5Yr = Math.round(cMonth * 60);
 
   return `
     <header class="page-header stagger-in" style="--i:0;">
       <div>
         <h1 class="page-title">المستشار الذكي</h1>
-        <p class="page-subtitle">تحليل ومحاكي «ماذا لو؟» بأرقامك الحقيقية</p>
+        <p class="page-subtitle">تحكم كامل بالتطبيق + قراءة الفواتير بالصور + ماذا لو</p>
       </div>
       <span class="badge ${hasKey ? 'badge-income' : 'badge-accent'}">
         ${icon('sparkles', 13)} ${hasKey ? 'Gemini AI متصل' : 'المحرك المحلي نشط'}
       </span>
     </header>
 
-    <!-- Quick Gemini API Connect / Test Card (Private localStorage only) -->
+    <!-- Quick Gemini API Connect / Test Card -->
     <section class="card stack-sm stagger-in" style="--i:1;">
       ${hasKey ? `
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
           <div style="display:flex;align-items:center;gap:10px;">
             <span class="row-icon income">${icon('check', 16)}</span>
             <div>
-              <div style="font-size:13.5px;font-weight:700;">مفتاح Gemini محفوظ على جوالك</div>
-              <div style="font-size:11.5px;color:var(--text-muted);">المحادثة الحية مفعّلة مع قراءة أرقامك</div>
+              <div style="font-size:13.5px;font-weight:700;">Gemini AI مفعّل بالكامل</div>
+              <div style="font-size:11.5px;color:var(--text-muted);">ينفذ أوامرك ويقرأ صور الفواتير تلقائياً</div>
             </div>
           </div>
-          <button type="button" class="btn btn-secondary btn-sm" data-action="test-gemini">اختبار الاتصال</button>
+          <button type="button" class="btn btn-secondary btn-sm" data-action="test-gemini">اختبار</button>
         </div>
       ` : `
         <div class="card-header" style="margin-bottom:2px;">
           <div>
-            <h2 class="card-title">${icon('sparkles', 16)} ربط Gemini AI على جوالك</h2>
-            <p class="card-subtitle">يُحفظ المفتاح محلياً في جوالك فقط للحماية ولا يُرفع على الإنترنت</p>
+            <h2 class="card-title">${icon('sparkles', 16)} تفعيل Gemini AI على جوالك</h2>
+            <p class="card-subtitle">يُحفظ المفتاح محلياً في جوالك مرة واحدة فقط لتفعيل قراءة الفواتير والأوامر الذكية</p>
           </div>
         </div>
         <form id="quick-gemini-form" style="display:flex;gap:8px;">
@@ -710,12 +720,12 @@ export function renderAdvisorView(simState) {
       `}
     </section>
 
-    <!-- Live Chat Box -->
+    <!-- Full-Access Agentic Chat + Receipt Vision Camera -->
     <section class="card stagger-in" style="--i:2;">
       <div class="card-header">
         <div>
-          <h2 class="card-title">محادثة المستشار</h2>
-          <p class="card-subtitle">${hasKey ? 'مدعوم بـ Gemini 2.5 Flash' : 'يحلل أرقامك محلياً فوراً'}</p>
+          <h2 class="card-title">${icon('receipt', 16)} محادثة وأوامر المستشار</h2>
+          <p class="card-subtitle">اكتب أي أمر ("دفعت 5 ريال كوفي") أو ارفع صورة فاتورة</p>
         </div>
         ${state.aiChat.length > 0 ? `<button class="btn btn-ghost" data-action="clear-chat">مسح</button>` : ''}
       </div>
@@ -727,29 +737,76 @@ export function renderAdvisorView(simState) {
       <div class="chat-box">
         <div id="ai-chat-messages" class="chat-messages">
           ${state.aiChat.length === 0 ? `
-            <div class="chat-msg assistant">حياك الله يا ${esc(state.profile.name)}. أنا جاهز أحلل مصاريفك الحقيقية وأرتب لك خطة الادخار والديون. اختر سؤال سريع فوق أو اكتب سؤالك تحت.</div>
+            <div class="chat-msg assistant">أهلاً يا ${esc(state.profile.name)}! عندي صلاحية كاملة أساعدك داخل ميزان:
+• قل لي مثلاً: «اليوم دفعت 5 ريال عشان كوفي» وبأسجلها فوراً في مصاريفك.
+• أو اضغط أيقونة الكاميرا تحت وارفع صورة فاتورة وبأقرأ المتجر والأصناف والخصم والإجمالي وأسجلها عنك تلقائياً.</div>
           ` : state.aiChat.map((m) => `
             <div class="chat-msg ${m.role === 'user' ? 'user' : 'assistant'}">${esc(m.text)}</div>
           `).join('')}
         </div>
         <form id="ai-chat-form" class="chat-input-row">
-          <input id="ai-chat-input" class="form-input" type="text" placeholder="اسأل المستشار عن ميزانيتك..." autocomplete="off">
+          <label class="btn-icon" style="width:44px;height:44px;flex-shrink:0;cursor:pointer;" title="تصوير أو رفع فاتورة" aria-label="رفع صورة فاتورة">
+            ${icon('camera', 18)}
+            <input type="file" id="ai-receipt-input" accept="image/*" class="hidden">
+          </label>
+          <input id="ai-chat-input" class="form-input" type="text" placeholder="اكتب أمرك أو سؤالك..." autocomplete="off">
           <button type="submit" class="btn btn-primary" aria-label="إرسال">${icon('send', 16)}</button>
         </form>
       </div>
     </section>
 
-    <!-- Interactive What-If Savings Simulator -->
+    <!-- Dedicated "لو ادخرت" Calculator (Any Amount: Daily / Weekly / Monthly) -->
     <section class="card stack-sm stagger-in" style="--i:3;">
       <div class="card-header" style="margin-bottom:2px;">
         <div>
-          <h2 class="card-title">${icon('sliders', 16)} محاكي «ماذا لو؟» للادخار</h2>
-          <p class="card-subtitle">حرّك المؤشر لترى أثر تقليل مصاريفك</p>
+          <h2 class="card-title">${icon('target', 16)} حاسبة «لو ادخرت»</h2>
+          <p class="card-subtitle">اكتب أي مبلغ تدخره وشوف كم يطلع لك شهرياً وسنوياً</p>
         </div>
-        <span class="num badge badge-accent" id="sim-pct-label">${cutPct}%</span>
+      </div>
+
+      <div class="quick-add-row">
+        <input id="custom-save-amount" class="form-input num" type="number" inputmode="decimal" min="0" step="any" placeholder="مبلغ الادخار..." value="${customAmt > 0 ? esc(customAmt) : ''}">
+        <select id="custom-save-freq" class="form-select">
+          <option value="daily" ${customFreq === 'daily' ? 'selected' : ''}>يومياً</option>
+          <option value="weekly" ${customFreq === 'weekly' ? 'selected' : ''}>أسبوعياً</option>
+          <option value="monthly" ${customFreq === 'monthly' ? 'selected' : ''}>شهرياً</option>
+        </select>
+      </div>
+
+      <div class="kpi-grid-2">
+        <div style="padding:11px;border-radius:var(--radius-md);background:var(--bg-surface-subtle);">
+          <div style="font-size:11px;color:var(--text-muted);">في الشهر</div>
+          <div class="num" style="font-size:16px;font-weight:700;margin-top:2px;" id="cs-month">${formatMoney(cMonth, cur)}</div>
+        </div>
+        <div style="padding:11px;border-radius:var(--radius-md);background:var(--bg-surface-subtle);">
+          <div style="font-size:11px;color:var(--text-muted);">في السنة (12 شهر)</div>
+          <div class="num amount-income" style="font-size:16px;font-weight:700;margin-top:2px;" id="cs-year">${formatMoney(cYear, cur)}</div>
+        </div>
+        <div style="padding:11px;border-radius:var(--radius-md);background:var(--bg-surface-subtle);">
+          <div style="font-size:11px;color:var(--text-muted);">في 3 سنوات</div>
+          <div class="num" style="font-size:16px;font-weight:700;margin-top:2px;" id="cs-3yr">${formatMoney(c3Yr, cur)}</div>
+        </div>
+        <div style="padding:11px;border-radius:var(--radius-md);background:var(--accent-primary-soft);border:1px solid var(--accent-primary-border);">
+          <div style="font-size:11px;color:var(--accent-primary);font-weight:600;">في 5 سنوات</div>
+          <div class="num" style="font-size:16px;font-weight:700;color:var(--accent-primary);margin-top:2px;" id="cs-5yr">${formatMoney(c5Yr, cur)}</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Unlimited What-If Expense Cut Simulator (0% to 100%) -->
+    <section class="card stack-sm stagger-in" style="--i:4;">
+      <div class="card-header" style="margin-bottom:2px;">
+        <div>
+          <h2 class="card-title">${icon('sliders', 16)} محاكي «ماذا لو خفضت مصاريفك؟»</h2>
+          <p class="card-subtitle">اختر أي نسبة بدون حد (من 0% حتى 100%)</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;">
+          <input id="sim-cut-input" class="form-input num" type="number" min="0" max="100" value="${cutPct}" style="width:68px;min-height:34px;padding:4px 8px;text-align:center;font-weight:700;">
+          <span style="font-size:13px;font-weight:700;">%</span>
+        </div>
       </div>
       ${baseExpense > 0 || plan.allocation.savings > 0 ? `
-        <input id="sim-cut-range" class="sim-range" type="range" min="0" max="40" step="5" value="${cutPct}">
+        <input id="sim-cut-range" class="sim-range" type="range" min="0" max="100" step="1" value="${cutPct}">
         <div class="kpi-grid-2" style="margin-top:4px;">
           <div style="padding:11px;border-radius:var(--radius-md);background:var(--bg-surface-subtle);">
             <div style="font-size:11px;color:var(--text-muted);">الادخار الشهري</div>
@@ -770,7 +827,7 @@ export function renderAdvisorView(simState) {
     </section>
 
     <!-- Monthly Plan & Insights -->
-    <section class="card stack-sm stagger-in" style="--i:4;">
+    <section class="card stack-sm stagger-in" style="--i:5;">
       <div class="card-header" style="margin-bottom:2px;">
         <div>
           <h2 class="card-title">${icon('sparkles', 16)} خطتك الشهرية المقترحة</h2>
@@ -813,7 +870,7 @@ export function renderAdvisorView(simState) {
 }
 
 // =========================================================================
-// 8. SETTINGS, CUSTOM CATEGORIES, GEMINI KEY & MOBILE PWA GUIDE
+// 8. SETTINGS
 // =========================================================================
 export function renderSettingsView() {
   const state = getState();

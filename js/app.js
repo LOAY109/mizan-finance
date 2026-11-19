@@ -1,4 +1,4 @@
-// Mizan Finance v3.0 — Mobile-First Controller, Motion Graphics & Native Bottom Sheets
+// Mizan Finance v4.0 — Mobile-First Controller, Agentic AI, Receipt Vision & Magic Key Activation
 
 import { icon } from './icons.js';
 import {
@@ -38,7 +38,7 @@ import {
 let currentRoute = 'dashboard';
 let activeMonth = currentMonthKey();
 const txFilters = { q: '', type: '', accountId: '', month: '' };
-const simState = { cutPct: 10 };
+const simState = { cutPct: 15, customSaveAmount: 0, customSaveFreq: 'daily' };
 
 const BOTTOM_TABS = [
   { id: 'dashboard', label: 'الرئيسية', icon: 'home' },
@@ -47,6 +47,23 @@ const BOTTOM_TABS = [
   { id: 'analytics', label: 'التحليلات', icon: 'chart' },
   { id: 'advisor', label: 'المستشار', icon: 'sparkles' }
 ];
+
+// Magic 1-Tap Private Activation via URL Hash (#key=AIza...)
+// Saves privately to device localStorage and immediately clears hash from browser address bar
+function ingestMagicKeyFromHash() {
+  const hash = window.location.hash || '';
+  const match = hash.match(/key=([^&]+)/);
+  if (match && match[1]) {
+    const key = decodeURIComponent(match[1]).trim();
+    if (key) {
+      updateProfile({ geminiApiKey: key });
+      try {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      } catch { /* ignore */ }
+      setTimeout(() => showToast('تم تفعيل Gemini AI على جوالك تلقائياً'), 400);
+    }
+  }
+}
 
 function applyVisualModes(profile) {
   document.documentElement.setAttribute('data-theme', profile.theme === 'dark' ? 'dark' : 'light');
@@ -73,6 +90,59 @@ function animateNumbers(privacyMode) {
     };
     requestAnimationFrame(tick);
   });
+}
+
+// Client-side Receipt Image Compression (Fast Mobile Upload to Gemini Vision)
+function compressReceiptImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('تعذر قراءة الصورة'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('ملف الصورة غير صالح'));
+      img.onload = () => {
+        const maxDim = 1024;
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        const base64 = dataUrl.split(',')[1];
+        resolve({ base64, mimeType: 'image/jpeg' });
+      };
+      img.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleReceiptFileUpload(file) {
+  if (!file) return;
+  if (currentRoute !== 'advisor') {
+    currentRoute = 'advisor';
+    renderApp();
+  }
+  showToast('جاري قراءة وتحليل الفاتورة...');
+  try {
+    const imagePayload = await compressReceiptImage(file);
+    appendChatMessage('user', 'تم رفع صورة فاتورة — حللها وسجلها في مصاريفي');
+    const reply = await askAdvisor('حلل هذه الفاتورة بالكامل (المتجر، الموقع، الأصناف، السعر قبل الخصم، الخصم، الضريبة، الإجمالي النهائي) وسجلها كمصروف.', imagePayload);
+    appendChatMessage('assistant', reply);
+    showToast('تم تحليل الفاتورة');
+  } catch (err) {
+    showToast(err.message || 'تعذر معالجة الصورة');
+  }
 }
 
 function renderApp() {
@@ -140,7 +210,7 @@ function renderApp() {
 }
 
 function bindViewSpecificHandlers() {
-  // Quick-Add Expense Card on Dashboard
+  // Dashboard: Quick-Add + Direct Receipt Camera Button
   if (currentRoute === 'dashboard') {
     const qaForm = document.getElementById('quick-add-form');
     if (qaForm) {
@@ -153,6 +223,14 @@ function bindViewSpecificHandlers() {
         const note = document.getElementById('qa-note').value;
         addTransaction({ type: 'expense', amount, category, accountId, date: todayISO(), note });
         showToast('تم تسجيل المصروف السريع');
+      });
+    }
+
+    const dashReceipt = document.getElementById('dash-receipt-input');
+    if (dashReceipt) {
+      dashReceipt.addEventListener('change', (e) => {
+        const file = e.target.files?.[0];
+        if (file) handleReceiptFileUpload(file);
       });
     }
   }
@@ -177,7 +255,7 @@ function bindViewSpecificHandlers() {
     bind('flt-month', 'month');
   }
 
-  // Advisor: Quick Gemini Key + Chat + Live What-If Simulator Slider
+  // Advisor: Quick Gemini Key + Chat + Receipt Camera + Unlimited What-If + Custom Savings
   if (currentRoute === 'advisor') {
     const box = document.getElementById('ai-chat-messages');
     if (box) box.scrollTop = box.scrollHeight;
@@ -195,6 +273,14 @@ function bindViewSpecificHandlers() {
       });
     }
 
+    const receiptInput = document.getElementById('ai-receipt-input');
+    if (receiptInput) {
+      receiptInput.addEventListener('change', (e) => {
+        const file = e.target.files?.[0];
+        if (file) handleReceiptFileUpload(file);
+      });
+    }
+
     const form = document.getElementById('ai-chat-form');
     if (form) {
       form.addEventListener('submit', async (e) => {
@@ -207,24 +293,51 @@ function bindViewSpecificHandlers() {
       });
     }
 
-    const slider = document.getElementById('sim-cut-range');
-    if (slider) {
-      slider.addEventListener('input', (e) => {
-        simState.cutPct = Number(e.target.value) || 0;
-        const state = getState();
-        const cur = state.profile.currency || 'SAR';
-        const plan = generateFinancialPlan(currentMonthKey());
-        const baseExp = plan.summary.monthExpense > 0 ? plan.summary.monthExpense : plan.allocation.wants;
-        const monthly = Math.round((baseExp * simState.cutPct) / 100) + Math.max(0, plan.allocation.savings);
-        document.getElementById('sim-pct-label').textContent = `${simState.cutPct}%`;
-        document.getElementById('sim-monthly').textContent = formatMoney(monthly, cur);
-        document.getElementById('sim-yearly').textContent = formatMoney(monthly * 12, cur);
-        document.getElementById('sim-3yr').textContent = formatMoney(monthly * 36, cur);
-      });
-    }
+    // Unlimited What-If Expense Cut (0% to 100%, synced slider + free numeric input)
+    const updateWhatIfUI = (pctVal) => {
+      const pct = Math.max(0, Math.min(100, Number(pctVal) || 0));
+      simState.cutPct = pct;
+      const sliderEl = document.getElementById('sim-cut-range');
+      const inputEl = document.getElementById('sim-cut-input');
+      if (sliderEl && Number(sliderEl.value) !== pct) sliderEl.value = String(pct);
+      if (inputEl && Number(inputEl.value) !== pct) inputEl.value = String(pct);
+
+      const state = getState();
+      const cur = state.profile.currency || 'SAR';
+      const plan = generateFinancialPlan(currentMonthKey());
+      const baseExp = plan.summary.monthExpense > 0 ? plan.summary.monthExpense : plan.allocation.wants;
+      const monthly = Math.round((baseExp * pct) / 100) + Math.max(0, plan.allocation.savings);
+      const mEl = document.getElementById('sim-monthly');
+      const yEl = document.getElementById('sim-yearly');
+      const tEl = document.getElementById('sim-3yr');
+      if (mEl) mEl.textContent = formatMoney(monthly, cur);
+      if (yEl) yEl.textContent = formatMoney(monthly * 12, cur);
+      if (tEl) tEl.textContent = formatMoney(monthly * 36, cur);
+    };
+
+    document.getElementById('sim-cut-range')?.addEventListener('input', (e) => updateWhatIfUI(e.target.value));
+    document.getElementById('sim-cut-input')?.addEventListener('input', (e) => updateWhatIfUI(e.target.value));
+
+    // Dedicated "لو ادخرت" Custom Savings Calculator
+    const updateCustomSavingsUI = () => {
+      const amt = Math.max(0, Number(document.getElementById('custom-save-amount')?.value) || 0);
+      const freq = document.getElementById('custom-save-freq')?.value || 'daily';
+      simState.customSaveAmount = amt;
+      simState.customSaveFreq = freq;
+      const cur = getState().profile.currency || 'SAR';
+      const mult = freq === 'daily' ? 30 : freq === 'weekly' ? 4.333 : 1;
+      const cMonth = Math.round(amt * mult);
+      document.getElementById('cs-month').textContent = formatMoney(cMonth, cur);
+      document.getElementById('cs-year').textContent = formatMoney(cMonth * 12, cur);
+      document.getElementById('cs-3yr').textContent = formatMoney(cMonth * 36, cur);
+      document.getElementById('cs-5yr').textContent = formatMoney(cMonth * 60, cur);
+    };
+
+    document.getElementById('custom-save-amount')?.addEventListener('input', updateCustomSavingsUI);
+    document.getElementById('custom-save-freq')?.addEventListener('change', updateCustomSavingsUI);
   }
 
-  // Settings: Profile + Custom Categories + Import Backup
+  // Settings
   if (currentRoute === 'settings') {
     const form = document.getElementById('settings-profile-form');
     if (form) {
@@ -900,6 +1013,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') closeModal();
 });
 
+ingestMagicKeyFromHash();
 subscribe(renderApp);
 renderApp();
 
