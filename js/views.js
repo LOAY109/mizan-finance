@@ -1,19 +1,29 @@
-// Modular View Renderers — Strictly Real User Data, Zero Demo Placeholders
+// Modular View Renderers v2.0 — Strictly Real User Data, Zero Demo Placeholders
 
 import { icon } from './icons.js';
 import {
   esc, formatMoney, formatDateAr, formatMonthAr, currentMonthKey,
-  ACCOUNT_TYPES, CURRENCIES, EXPENSE_CATEGORIES
+  ACCOUNT_TYPES, CURRENCIES
 } from './utils.js';
-import { getState, getFinancialSummary } from './store.js';
+import { getState, getFinancialSummary, getAllCategories } from './store.js';
 import { generateFinancialPlan } from './ai-engine.js';
-import { renderDonutChart, renderCashflowBarChart } from './charts.js';
+import { renderDonutChart, renderCashflowBarChart, renderDailySpendChart } from './charts.js';
 
 function accountNameById(accounts, id) {
   return accounts.find((a) => a.id === id)?.name || 'بدون حساب مرتبط';
 }
 
-function txRowHtml(tx, accounts, cur, showDelete = false) {
+function monthSwitcherHtml(activeMonth) {
+  return `
+    <div class="month-switcher" aria-label="تغيير الشهر">
+      <button class="month-switcher-btn" data-action="shift-month" data-delta="-1" aria-label="الشهر السابق">${icon('chevronRight', 16)}</button>
+      <span class="month-switcher-label">${esc(formatMonthAr(activeMonth))}</span>
+      <button class="month-switcher-btn" data-action="shift-month" data-delta="1" aria-label="الشهر التالي">${icon('chevronLeft', 16)}</button>
+    </div>
+  `;
+}
+
+function txRowHtml(tx, accounts, cur, showActions = false) {
   const isIncome = tx.type === 'income';
   const isTransfer = tx.type === 'transfer';
   const sign = isIncome ? '+' : isTransfer ? '' : '-';
@@ -40,29 +50,33 @@ function txRowHtml(tx, accounts, cur, showDelete = false) {
       </div>
       <div class="row-end">
         <span class="num amount-${cls}">${sign}${formatMoney(tx.amount, cur)}</span>
-        ${showDelete ? `<button class="btn-icon" style="width:36px;height:36px;" data-action="delete-tx" data-id="${tx.id}" aria-label="حذف المعاملة">${icon('trash', 15)}</button>` : ''}
+        ${showActions ? `
+          <button class="btn-icon" style="width:36px;height:36px;" data-action="edit-tx" data-id="${tx.id}" aria-label="تعديل المعاملة">${icon('edit', 15)}</button>
+          <button class="btn-icon" style="width:36px;height:36px;" data-action="delete-tx" data-id="${tx.id}" aria-label="حذف المعاملة">${icon('trash', 15)}</button>
+        ` : ''}
       </div>
     </div>
   `;
 }
 
-export function renderDashboardView() {
+export function renderDashboardView(activeMonth) {
   const state = getState();
   const cur = state.profile.currency || 'SAR';
-  const mKey = currentMonthKey();
-  const plan = generateFinancialPlan();
+  const plan = generateFinancialPlan(activeMonth);
   const s = plan.summary;
+  const expCats = getAllCategories('expense');
 
-  const recentTxs = state.transactions.slice(0, 6);
+  const monthTxs = state.transactions.filter((t) => (t.date || '').startsWith(activeMonth)).slice(0, 6);
   const topInsight = plan.insights[0];
 
   return `
     <header class="page-header">
       <div>
         <h1 class="page-title">مرحباً ${esc(state.profile.name)}</h1>
-        <p class="page-subtitle">ملخص ${esc(formatMonthAr(mKey))} — كل أرقامك حقيقية ومحدثة لحظياً</p>
+        <p class="page-subtitle">كل أرقامك حقيقية ومحدثة لحظياً على جهازك</p>
       </div>
       <div class="header-actions">
+        ${monthSwitcherHtml(activeMonth)}
         <button class="btn btn-secondary" data-action="open-modal" data-modal="account">${icon('wallet', 16)} حساب جديد</button>
         <button class="btn btn-primary" data-action="open-modal" data-modal="transaction">${icon('plus', 17)} معاملة جديدة</button>
       </div>
@@ -80,7 +94,7 @@ export function renderDashboardView() {
 
       <div class="kpi-card">
         <div class="kpi-top">
-          <span class="kpi-label">دخل هذا الشهر</span>
+          <span class="kpi-label">دخل الشهر</span>
           <span class="badge badge-income">${icon('arrowDown', 13)} دخل</span>
         </div>
         <div class="kpi-value amount-income">${formatMoney(s.monthIncome, cur)}</div>
@@ -89,11 +103,13 @@ export function renderDashboardView() {
 
       <div class="kpi-card">
         <div class="kpi-top">
-          <span class="kpi-label">مصاريف هذا الشهر</span>
-          <span class="badge badge-expense">${icon('arrowUp', 13)} صرف</span>
+          <span class="kpi-label">مصاريف الشهر</span>
+          ${s.expenseDeltaPct !== null
+            ? `<span class="badge ${s.expenseDeltaPct > 0 ? 'badge-expense' : 'badge-income'}">${s.expenseDeltaPct > 0 ? '+' : ''}${s.expenseDeltaPct}% عن السابق</span>`
+            : `<span class="badge badge-expense">${icon('arrowUp', 13)} صرف</span>`}
         </div>
         <div class="kpi-value amount-expense">${formatMoney(s.monthExpense, cur)}</div>
-        <div class="kpi-meta">${s.monthTxCount} معاملة مسجلة هذا الشهر</div>
+        <div class="kpi-meta">${s.monthTxCount} معاملة مسجلة في هذا الشهر</div>
       </div>
 
       <div class="kpi-card">
@@ -101,10 +117,27 @@ export function renderDashboardView() {
           <span class="kpi-label">سقف الصرف اليومي الآمن</span>
           <span class="badge badge-accent">${icon('sparkles', 13)} ذكي</span>
         </div>
-        <div class="kpi-value">${plan.allocation.baseIncome > 0 ? formatMoney(plan.safeDailySpend, cur) : '—'}</div>
-        <div class="kpi-meta">${plan.allocation.baseIncome > 0 ? `لباقي ${plan.daysLeft} يوم في الشهر` : 'حدد دخلك الشهري لتفعيله'}</div>
+        <div class="kpi-value">${plan.allocation.baseIncome > 0 && plan.daysLeft > 0 ? formatMoney(plan.safeDailySpend, cur) : '—'}</div>
+        <div class="kpi-meta">${plan.allocation.baseIncome > 0 && plan.daysLeft > 0 ? `لباقي ${plan.daysLeft} يوم في الشهر` : (plan.daysLeft === 0 ? 'شهر سابق' : 'حدد دخلك الشهري لتفعيله')}</div>
       </div>
     </section>
+
+    <form id="quick-add-form" class="quick-add-bar" aria-label="تسجيل مصروف سريع">
+      <div style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--accent-primary);white-space:nowrap;">
+        ${icon('zap', 16)} مصروف سريع
+      </div>
+      <input id="qa-amount" class="form-input num" type="number" inputmode="decimal" min="0.01" step="any" required placeholder="المبلغ">
+      <select id="qa-cat" class="form-select">
+        ${expCats.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join('')}
+      </select>
+      ${state.accounts.length > 0 ? `
+        <select id="qa-acc" class="form-select">
+          ${state.accounts.map((a) => `<option value="${a.id}">${esc(a.name)}</option>`).join('')}
+        </select>
+      ` : ''}
+      <input id="qa-note" class="form-input" type="text" placeholder="ملاحظة سريعة (اختياري)">
+      <button type="submit" class="btn btn-primary btn-sm" style="min-height:44px;padding:0 16px;">${icon('plus', 15)} تسجيل</button>
+    </form>
 
     ${topInsight ? `
       <section class="ai-banner" style="margin-bottom:20px;">
@@ -124,19 +157,19 @@ export function renderDashboardView() {
         <section class="card">
           <div class="card-header">
             <div>
-              <h2 class="card-title">آخر المعاملات</h2>
+              <h2 class="card-title">معاملات ${esc(formatMonthAr(activeMonth))}</h2>
               <p class="card-subtitle">سجل حركاتك المالية الفعلية</p>
             </div>
-            ${state.transactions.length > 0 ? `<button class="btn btn-ghost btn-sm" data-nav="transactions">عرض الكل</button>` : ''}
+            ${state.transactions.length > 0 ? `<button class="btn btn-ghost btn-sm" data-nav="transactions">عرض السجل الكامل</button>` : ''}
           </div>
-          ${recentTxs.length === 0 ? `
+          ${monthTxs.length === 0 ? `
             <div class="empty-state">
               <div class="empty-icon">${icon('arrows', 22)}</div>
-              <div class="empty-title">لا توجد معاملات مسجلة بعد</div>
-              <p class="empty-desc">سجّل أول مصروف أو دخل حقيقي لك ليبدأ التتبع والتحليل التلقائي.</p>
-              <button class="btn btn-primary btn-sm" data-action="open-modal" data-modal="transaction">${icon('plus', 15)} إضافة أول معاملة</button>
+              <div class="empty-title">لا توجد معاملات مسجلة في هذا الشهر</div>
+              <p class="empty-desc">استخدم شريط "مصروف سريع" بالأعلى أو أضف معاملة مفصلة ليبدأ التتبع والتحليل.</p>
+              <button class="btn btn-primary btn-sm" data-action="open-modal" data-modal="transaction">${icon('plus', 15)} إضافة معاملة</button>
             </div>
-          ` : recentTxs.map((t) => txRowHtml(t, state.accounts, cur, false)).join('')}
+          ` : monthTxs.map((t) => txRowHtml(t, state.accounts, cur, false)).join('')}
         </section>
 
         <section class="card">
@@ -183,7 +216,7 @@ export function renderDashboardView() {
           </div>
           ${state.budgets.length === 0 ? `
             <div class="empty-state" style="padding:20px 10px;">
-              <p class="empty-desc">ضع سقف صرف شهري لفئاتك المهمة لتصلك تنبيهات قبل تجاوز الحد.</p>
+              <p class="empty-desc">ضع سقف صرف شهري لفئاتك أو ولّد ميزانية ذكية تلقائياً حسب دخلك.</p>
               <button class="btn btn-secondary btn-sm" data-action="open-modal" data-modal="budget">${icon('plus', 15)} إضافة ميزانية</button>
             </div>
           ` : state.budgets.slice(0, 4).map((b) => {
@@ -229,7 +262,7 @@ export function renderTransactionsView(filters) {
     <header class="page-header">
       <div>
         <h1 class="page-title">المعاملات المالية</h1>
-        <p class="page-subtitle">سجّل وابحث في كل عمليات الدخل والمصاريف والتحويلات</p>
+        <p class="page-subtitle">سجّل وعدّل وابحث في كل عمليات الدخل والمصاريف والتحويلات</p>
       </div>
       <div class="header-actions">
         <button class="btn btn-secondary" data-action="export-csv">${icon('download', 16)} تصدير CSV</button>
@@ -342,6 +375,7 @@ export function renderBudgetsView() {
         <p class="page-subtitle">تحكّم بحدود الصرف الشهري وتابع فواتيرك واشتراكاتك</p>
       </div>
       <div class="header-actions">
+        <button class="btn btn-secondary" data-action="auto-budgets">${icon('sparkles', 16)} توليد ميزانيات ذكية</button>
         <button class="btn btn-secondary" data-action="open-modal" data-modal="recurring">${icon('calendar', 16)} التزام متكرر</button>
         <button class="btn btn-primary" data-action="open-modal" data-modal="budget">${icon('plus', 17)} ميزانية فئة</button>
       </div>
@@ -359,8 +393,11 @@ export function renderBudgetsView() {
           <div class="empty-state">
             <div class="empty-icon">${icon('pie', 22)}</div>
             <div class="empty-title">لا توجد ميزانيات محددة</div>
-            <p class="empty-desc">حدد سقفاً شهرياً لأهم فئات صرفك مثل الطعام أو المقاضي أو التسوق.</p>
-            <button class="btn btn-primary btn-sm" data-action="open-modal" data-modal="budget">${icon('plus', 15)} إضافة ميزانية</button>
+            <p class="empty-desc">حدد سقفاً شهرياً يدوياً أو اضغط "توليد ميزانيات ذكية" ليتم تقسيم دخلك تلقائياً على أهم الفئات.</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+              <button class="btn btn-primary btn-sm" data-action="open-modal" data-modal="budget">${icon('plus', 15)} إضافة ميزانية</button>
+              <button class="btn btn-secondary btn-sm" data-action="auto-budgets">${icon('sparkles', 15)} توليد تلقائي</button>
+            </div>
           </div>
         ` : state.budgets.map((b) => {
           const spent = s.byCategory[b.category] || 0;
@@ -523,10 +560,10 @@ export function renderGoalsView() {
   `;
 }
 
-export function renderAnalyticsView() {
+export function renderAnalyticsView(activeMonth) {
   const state = getState();
   const cur = state.profile.currency || 'SAR';
-  const plan = generateFinancialPlan();
+  const plan = generateFinancialPlan(activeMonth);
   const s = plan.summary;
 
   return `
@@ -534,6 +571,9 @@ export function renderAnalyticsView() {
       <div>
         <h1 class="page-title">التحليلات والتقارير</h1>
         <p class="page-subtitle">قراءة بصرية دقيقة لتدفقاتك المالية الحقيقية</p>
+      </div>
+      <div class="header-actions">
+        ${monthSwitcherHtml(activeMonth)}
       </div>
     </header>
 
@@ -544,7 +584,7 @@ export function renderAnalyticsView() {
         <div class="kpi-meta">${plan.score !== null ? (plan.score >= 75 ? 'وضع مالي قوي ومستقر' : plan.score >= 50 ? 'وضع جيد قابل للتحسين' : 'يحتاج إعادة ضبط للمصاريف') : 'يُحسب بعد تسجيل بياناتك'}</div>
       </div>
       <div class="kpi-card">
-        <span class="kpi-label">نسبة الادخار هذا الشهر</span>
+        <span class="kpi-label">نسبة الادخار</span>
         <div class="kpi-value">${plan.savingsRate !== null ? `${plan.savingsRate}%` : '—'}</div>
         <div class="kpi-meta">الهدف الموصى به 20% فأكثر</div>
       </div>
@@ -560,38 +600,57 @@ export function renderAnalyticsView() {
       </div>
     </section>
 
-    <div class="grid-2">
+    <div class="stack-md">
       <section class="card">
-        <div class="card-header"><h2 class="card-title">توزيع مصاريف الشهر حسب الفئة</h2></div>
-        ${renderDonutChart(s.byCategory, cur)}
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">منحنى الصرف اليومي (${esc(formatMonthAr(activeMonth))})</h2>
+            <p class="card-subtitle">اكتشف الأيام الأكثر صرفاً خلال الشهر</p>
+          </div>
+        </div>
+        ${renderDailySpendChart(s.byDay, activeMonth, cur)}
       </section>
-      <section class="card">
-        <div class="card-header"><h2 class="card-title">مقارنة الدخل والمصاريف (آخر 6 أشهر)</h2></div>
-        ${renderCashflowBarChart(state.transactions, cur)}
-      </section>
+
+      <div class="grid-2">
+        <section class="card">
+          <div class="card-header"><h2 class="card-title">توزيع مصاريف الشهر حسب الفئة</h2></div>
+          ${renderDonutChart(s.byCategory, cur)}
+        </section>
+        <section class="card">
+          <div class="card-header"><h2 class="card-title">مقارنة الدخل والمصاريف (آخر 6 أشهر)</h2></div>
+          ${renderCashflowBarChart(state.transactions, cur)}
+        </section>
+      </div>
     </div>
   `;
 }
 
-export function renderAdvisorView() {
+export function renderAdvisorView(simState) {
   const state = getState();
   const cur = state.profile.currency || 'SAR';
-  const plan = generateFinancialPlan();
+  const plan = generateFinancialPlan(currentMonthKey());
   const hasKey = Boolean((state.profile.geminiApiKey || '').trim());
 
   const quickPrompts = [
     'حلل مصاريفي هذا الشهر',
+    'قارن مصاريفي بالشهر الماضي',
     'اقترح لي خطة ادخار مناسبة',
     'كم أقدر أصرف يومياً؟',
-    'رتب لي سداد ديوني',
+    'كم صندوق الطوارئ المناسب لي؟',
     'كم زكاتي التقديرية؟'
   ];
+
+  const baseExpense = plan.summary.monthExpense > 0 ? plan.summary.monthExpense : plan.allocation.wants;
+  const cutPct = simState.cutPct;
+  const monthlySaved = Math.round((baseExpense * cutPct) / 100) + Math.max(0, plan.allocation.savings);
+  const yearlySaved = monthlySaved * 12;
+  const threeYearSaved = monthlySaved * 36;
 
   return `
     <header class="page-header">
       <div>
         <h1 class="page-title">المستشار المالي الذكي</h1>
-        <p class="page-subtitle">تحليل وتخطيط مبني بالكامل على استبيانك وأرقامك الحقيقية</p>
+        <p class="page-subtitle">تحليل وتخطيط ومحاكاة مبنية بالكامل على استبيانك وأرقامك الحقيقية</p>
       </div>
       <div class="header-actions">
         <span class="badge ${hasKey ? 'badge-income' : 'badge-accent'}">${icon('sparkles', 13)} ${hasKey ? 'متصل بـ Gemini AI' : 'المحرك الذكي المحلي نشط'}</span>
@@ -600,47 +659,81 @@ export function renderAdvisorView() {
     </header>
 
     <div class="grid-main-side">
-      <section class="card stack-md">
-        <div class="card-header" style="margin-bottom:4px;">
-          <div>
-            <h2 class="card-title">${icon('sparkles', 18)} خطتك الشهرية المقترحة</h2>
-            <p class="card-subtitle">${esc(plan.allocation.ruleName)}</p>
+      <div class="stack-md">
+        <section class="card stack-md">
+          <div class="card-header" style="margin-bottom:4px;">
+            <div>
+              <h2 class="card-title">${icon('sparkles', 18)} خطتك الشهرية المقترحة</h2>
+              <p class="card-subtitle">${esc(plan.allocation.ruleName)}</p>
+            </div>
+            ${plan.score !== null ? `<span class="badge badge-accent">الصحة المالية: ${plan.score}/100</span>` : ''}
           </div>
-          ${plan.score !== null ? `<span class="badge badge-accent">الصحة المالية: ${plan.score}/100</span>` : ''}
-        </div>
 
-        ${plan.allocation.baseIncome > 0 ? `
-          <div class="grid-3">
-            <div style="padding:14px;border-radius:var(--radius-md);background:var(--bg-surface-subtle);">
-              <div style="font-size:12px;color:var(--text-muted);">الأساسيات والالتزامات</div>
-              <div class="num" style="font-size:19px;font-weight:700;margin-top:4px;">${formatMoney(plan.allocation.needs, cur)}</div>
+          ${plan.allocation.baseIncome > 0 ? `
+            <div class="grid-3">
+              <div style="padding:14px;border-radius:var(--radius-md);background:var(--bg-surface-subtle);">
+                <div style="font-size:12px;color:var(--text-muted);">الأساسيات والالتزامات</div>
+                <div class="num" style="font-size:19px;font-weight:700;margin-top:4px;">${formatMoney(plan.allocation.needs, cur)}</div>
+              </div>
+              <div style="padding:14px;border-radius:var(--radius-md);background:var(--bg-surface-subtle);">
+                <div style="font-size:12px;color:var(--text-muted);">المصاريف المرنة</div>
+                <div class="num" style="font-size:19px;font-weight:700;margin-top:4px;">${formatMoney(plan.allocation.wants, cur)}</div>
+              </div>
+              <div style="padding:14px;border-radius:var(--radius-md);background:var(--accent-primary-soft);border:1px solid var(--accent-primary-border);">
+                <div style="font-size:12px;color:var(--accent-primary);font-weight:600;">الادخار والأهداف</div>
+                <div class="num" style="font-size:19px;font-weight:700;color:var(--accent-primary);margin-top:4px;">${formatMoney(plan.allocation.savings, cur)}</div>
+              </div>
             </div>
-            <div style="padding:14px;border-radius:var(--radius-md);background:var(--bg-surface-subtle);">
-              <div style="font-size:12px;color:var(--text-muted);">المصاريف المرنة</div>
-              <div class="num" style="font-size:19px;font-weight:700;margin-top:4px;">${formatMoney(plan.allocation.wants, cur)}</div>
+          ` : `
+            <div class="empty-state" style="padding:18px;">
+              <p class="empty-desc">أضف دخلك الشهري في الإعدادات أو سجّل أول دخل لك ليتم تقسيم ميزانيتك تلقائياً.</p>
+              <button class="btn btn-secondary btn-sm" data-nav="settings">ضبط الدخل في الإعدادات</button>
             </div>
-            <div style="padding:14px;border-radius:var(--radius-md);background:var(--accent-primary-soft);border:1px solid var(--accent-primary-border);">
-              <div style="font-size:12px;color:var(--accent-primary);font-weight:600;">الادخار والأهداف</div>
-              <div class="num" style="font-size:19px;font-weight:700;color:var(--accent-primary);margin-top:4px;">${formatMoney(plan.allocation.savings, cur)}</div>
-            </div>
-          </div>
-        ` : `
-          <div class="empty-state" style="padding:18px;">
-            <p class="empty-desc">أضف دخلك الشهري في الإعدادات أو سجّل أول دخل لك ليتم تقسيم ميزانيتك تلقائياً.</p>
-            <button class="btn btn-secondary btn-sm" data-nav="settings">ضبط الدخل في الإعدادات</button>
-          </div>
-        `}
+          `}
 
-        <div class="stack-sm">
-          <div style="font-size:13px;font-weight:700;color:var(--text-secondary);">توصيات وتنبيهات مخصصة لك</div>
-          ${plan.insights.map((ins) => `
-            <div style="padding:14px;border-radius:var(--radius-md);border:1px solid var(--border-subtle);background:var(--bg-surface);">
-              <div style="font-weight:600;font-size:14px;margin-bottom:4px;">${esc(ins.title)}</div>
-              <div style="font-size:13px;color:var(--text-secondary);">${esc(ins.body)}</div>
+          <div class="stack-sm">
+            <div style="font-size:13px;font-weight:700;color:var(--text-secondary);">توصيات وتنبيهات مخصصة لك</div>
+            ${plan.insights.map((ins) => `
+              <div style="padding:14px;border-radius:var(--radius-md);border:1px solid var(--border-subtle);background:var(--bg-surface);">
+                <div style="font-weight:600;font-size:14px;margin-bottom:4px;">${esc(ins.title)}</div>
+                <div style="font-size:13px;color:var(--text-secondary);">${esc(ins.body)}</div>
+              </div>
+            `).join('')}
+          </div>
+        </section>
+
+        <section class="card stack-sm">
+          <div class="card-header" style="margin-bottom:4px;">
+            <div>
+              <h2 class="card-title">${icon('sliders', 17)} محاكي «ماذا لو؟» للادخار</h2>
+              <p class="card-subtitle">حرّك المؤشر لترى أثر تقليل المصاريف على مدخراتك خلال سنة و3 سنوات</p>
             </div>
-          `).join('')}
-        </div>
-      </section>
+          </div>
+          ${baseExpense > 0 || plan.allocation.savings > 0 ? `
+            <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;">
+              <span>نسبة خفض المصاريف الإضافية</span>
+              <span class="num badge badge-accent" id="sim-pct-label">${cutPct}%</span>
+            </div>
+            <input id="sim-cut-range" class="sim-range" type="range" min="0" max="40" step="5" value="${cutPct}">
+            <div class="grid-3" style="margin-top:6px;">
+              <div style="padding:12px;border-radius:var(--radius-md);background:var(--bg-surface-subtle);">
+                <div style="font-size:11px;color:var(--text-muted);">الادخار الشهري المتوقع</div>
+                <div class="num" style="font-size:17px;font-weight:700;margin-top:3px;" id="sim-monthly">${formatMoney(monthlySaved, cur)}</div>
+              </div>
+              <div style="padding:12px;border-radius:var(--radius-md);background:var(--bg-surface-subtle);">
+                <div style="font-size:11px;color:var(--text-muted);">خلال سنة (12 شهر)</div>
+                <div class="num amount-income" style="font-size:17px;font-weight:700;margin-top:3px;" id="sim-yearly">${formatMoney(yearlySaved, cur)}</div>
+              </div>
+              <div style="padding:12px;border-radius:var(--radius-md);background:var(--accent-primary-soft);">
+                <div style="font-size:11px;color:var(--accent-primary);font-weight:600;">خلال 3 سنوات</div>
+                <div class="num" style="font-size:17px;font-weight:700;color:var(--accent-primary);margin-top:3px;" id="sim-3yr">${formatMoney(threeYearSaved, cur)}</div>
+              </div>
+            </div>
+          ` : `
+            <p style="font-size:13px;color:var(--text-secondary);">سجّل دخلك أو أول مصاريفك ليعمل المحاكي تلقائياً بأرقامك الحقيقية.</p>
+          `}
+        </section>
+      </div>
 
       <section class="card">
         <div class="card-header">
@@ -675,52 +768,76 @@ export function renderAdvisorView() {
 export function renderSettingsView() {
   const state = getState();
   const p = state.profile;
+  const customExp = state.customCategories?.expense || [];
+  const customInc = state.customCategories?.income || [];
 
   return `
     <header class="page-header">
       <div>
         <h1 class="page-title">الإعدادات والبيانات</h1>
-        <p class="page-subtitle">تحكّم بملفك الشخصي، الذكاء الاصطناعي، والنسخ الاحتياطي</p>
+        <p class="page-subtitle">تحكّم بملفك الشخصي، الفئات المخصصة، الذكاء الاصطناعي، والنسخ الاحتياطي</p>
       </div>
     </header>
 
     <div class="grid-2">
-      <section class="card">
-        <div class="card-header"><h2 class="card-title">الملف الشخصي والاستبيان</h2></div>
-        <form id="settings-profile-form" class="stack-md">
-          <div class="form-group">
-            <label class="form-label" for="set-name">الاسم</label>
-            <input id="set-name" class="form-input" type="text" required value="${esc(p.name)}">
-          </div>
-          <div class="form-grid">
+      <div class="stack-md">
+        <section class="card">
+          <div class="card-header"><h2 class="card-title">الملف الشخصي والاستبيان</h2></div>
+          <form id="settings-profile-form" class="stack-md">
             <div class="form-group">
-              <label class="form-label" for="set-currency">العملة</label>
-              <select id="set-currency" class="form-select">
-                ${Object.values(CURRENCIES).map((c) => `<option value="${c.code}" ${p.currency === c.code ? 'selected' : ''}>${esc(c.name)} (${esc(c.symbol)})</option>`).join('')}
+              <label class="form-label" for="set-name">الاسم</label>
+              <input id="set-name" class="form-input" type="text" required value="${esc(p.name)}">
+            </div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label" for="set-currency">العملة</label>
+                <select id="set-currency" class="form-select">
+                  ${Object.values(CURRENCIES).map((c) => `<option value="${c.code}" ${p.currency === c.code ? 'selected' : ''}>${esc(c.name)} (${esc(c.symbol)})</option>`).join('')}
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="set-income">الدخل الشهري المتوقع</label>
+                <input id="set-income" class="form-input num" type="number" inputmode="decimal" min="0" step="any" value="${esc(p.monthlyIncome)}">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="set-rule">قاعدة توزيع الميزانية</label>
+              <select id="set-rule" class="form-select">
+                <option value="50_30_20" ${p.budgetRule === '50_30_20' ? 'selected' : ''}>50 / 30 / 20 المتوازنة</option>
+                <option value="60_20_20" ${p.budgetRule === '60_20_20' ? 'selected' : ''}>60 / 20 / 20 للاستقرار</option>
+                <option value="70_20_10" ${p.budgetRule === '70_20_10' ? 'selected' : ''}>70 / 10 / 20 للالتزامات العالية</option>
+                <option value="custom" ${p.budgetRule === 'custom' ? 'selected' : ''}>50 / 20 / 30 للادخار المكثف</option>
               </select>
             </div>
             <div class="form-group">
-              <label class="form-label" for="set-income">الدخل الشهري المتوقع</label>
-              <input id="set-income" class="form-input num" type="number" inputmode="decimal" min="0" step="any" value="${esc(p.monthlyIncome)}">
+              <label class="form-label" for="set-apikey">مفتاح Gemini API (اختياري للمحادثة الحية)</label>
+              <input id="set-apikey" class="form-input" type="password" placeholder="AIza..." value="${esc(p.geminiApiKey || '')}">
+              <span class="form-hint">يُحفظ محلياً على جهازك فقط ولا يُرسل لأي طرف ثالث غير Google Gemini عند محادثتك.</span>
             </div>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="set-rule">قاعدة توزيع الميزانية</label>
-            <select id="set-rule" class="form-select">
-              <option value="50_30_20" ${p.budgetRule === '50_30_20' ? 'selected' : ''}>50 / 30 / 20 المتوازنة</option>
-              <option value="60_20_20" ${p.budgetRule === '60_20_20' ? 'selected' : ''}>60 / 20 / 20 للاستقرار</option>
-              <option value="70_20_10" ${p.budgetRule === '70_20_10' ? 'selected' : ''}>70 / 10 / 20 للالتزامات العالية</option>
-              <option value="custom" ${p.budgetRule === 'custom' ? 'selected' : ''}>50 / 20 / 30 للادخار المكثف</option>
+            <button type="submit" class="btn btn-primary">${icon('check', 16)} حفظ التعديلات</button>
+          </form>
+        </section>
+
+        <section class="card stack-sm">
+          <div class="card-header" style="margin-bottom:4px;"><h2 class="card-title">فئاتك المخصصة</h2></div>
+          <form id="custom-cat-form" style="display:flex;gap:8px;flex-wrap:wrap;">
+            <select id="cc-type" class="form-select" style="width:auto;min-width:110px;">
+              <option value="expense">مصروف</option>
+              <option value="income">دخل</option>
             </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="set-apikey">مفتاح Gemini API (اختياري للمحادثة الحية)</label>
-            <input id="set-apikey" class="form-input" type="password" placeholder="AIza..." value="${esc(p.geminiApiKey || '')}">
-            <span class="form-hint">يُحفظ محلياً على جهازك فقط ولا يُرسل لأي طرف ثالث غير Google Gemini عند محادثتك.</span>
-          </div>
-          <button type="submit" class="btn btn-primary">${icon('check', 16)} حفظ التعديلات</button>
-        </form>
-      </section>
+            <input id="cc-name" class="form-input" style="flex:1;min-width:140px;" type="text" placeholder="اسم الفئة الجديدة..." required>
+            <button type="submit" class="btn btn-secondary">${icon('plus', 15)} إضافة</button>
+          </form>
+          ${customExp.length === 0 && customInc.length === 0 ? `
+            <p style="font-size:12px;color:var(--text-muted);">أضف فئات إضافية تناسب نمط حياتك وستظهر فوراً في قوائم المعاملات والميزانيات.</p>
+          ` : `
+            <div class="tag-list" style="margin-top:4px;">
+              ${customExp.map((c) => `<span class="tag-chip">${esc(c)} (مصروف) <button type="button" data-action="remove-cat" data-type="expense" data-name="${esc(c)}" aria-label="حذف">${icon('close', 12)}</button></span>`).join('')}
+              ${customInc.map((c) => `<span class="tag-chip">${esc(c)} (دخل) <button type="button" data-action="remove-cat" data-type="income" data-name="${esc(c)}" aria-label="حذف">${icon('close', 12)}</button></span>`).join('')}
+            </div>
+          `}
+        </section>
+      </div>
 
       <div class="stack-md">
         <section class="card stack-sm">
@@ -729,9 +846,10 @@ export function renderSettingsView() {
         </section>
 
         <section class="card stack-sm">
-          <div class="card-header" style="margin-bottom:4px;"><h2 class="card-title">المظهر والنسخ الاحتياطي</h2></div>
+          <div class="card-header" style="margin-bottom:4px;"><h2 class="card-title">المظهر والخصوصية والنسخ الاحتياطي</h2></div>
           <div style="display:flex;flex-wrap:wrap;gap:10px;">
-            <button class="btn btn-secondary" data-action="toggle-theme">${icon(p.theme === 'dark' ? 'sun' : 'moon', 16)} ${p.theme === 'dark' ? 'التبديل للوضع الفاتح' : 'التبديل للوضع الداكن'}</button>
+            <button class="btn btn-secondary" data-action="toggle-theme">${icon(p.theme === 'dark' ? 'sun' : 'moon', 16)} ${p.theme === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن'}</button>
+            <button class="btn btn-secondary" data-action="toggle-privacy">${icon(p.privacyMode ? 'eye' : 'eyeOff', 16)} ${p.privacyMode ? 'إظهار الأرقام' : 'إخفاء الأرقام'}</button>
             <button class="btn btn-secondary" data-action="export-json">${icon('download', 16)} حفظ نسخة احتياطية</button>
             <label class="btn btn-secondary" style="cursor:pointer;">
               ${icon('upload', 16)} استعادة نسخة
@@ -751,5 +869,3 @@ export function renderSettingsView() {
     </div>
   `;
 }
-
-export { EXPENSE_CATEGORIES };

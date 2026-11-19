@@ -1,4 +1,4 @@
-// Crisp Pure-SVG Interactive Financial Charts (Zero External Dependencies)
+// Crisp Pure-SVG Interactive Financial Charts v2.0 (Zero External Dependencies)
 
 import { esc, formatMoney, getLastNMonths } from './utils.js';
 
@@ -116,6 +116,65 @@ export function renderCashflowBarChart(transactions, currency) {
         <span style="display:inline-flex;align-items:center;gap:6px;"><span class="legend-dot" style="background:var(--color-income)"></span>الدخل</span>
         <span style="display:inline-flex;align-items:center;gap:6px;"><span class="legend-dot" style="background:var(--color-expense)"></span>المصاريف</span>
       </div>
+    </div>
+  `;
+}
+
+export function renderDailySpendChart(byDay, monthKey, currency) {
+  const [y, m] = monthKey.split('-').map(Number);
+  const daysInMonth = new Date(y, m || 1, 0).getDate();
+  const points = [];
+  let maxVal = 0;
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const val = byDay[d] || 0;
+    if (val > maxVal) maxVal = val;
+    points.push({ day: d, val });
+  }
+
+  if (maxVal <= 0) {
+    return `<div class="empty-state" style="padding:24px 12px;">
+      <p class="empty-desc">سيظهر منحنى صرفك اليومي خلال الشهر بمجرد تسجيل أول مصروف.</p>
+    </div>`;
+  }
+
+  const width = 560;
+  const height = 185;
+  const padX = 16;
+  const padTop = 16;
+  const padBottom = 30;
+  const plotW = width - padX * 2;
+  const plotH = height - padTop - padBottom;
+
+  const coords = points.map((p, idx) => {
+    const x = padX + (idx / Math.max(1, daysInMonth - 1)) * plotW;
+    const yPos = padTop + plotH - (p.val / maxVal) * plotH;
+    return { ...p, x, y: yPos };
+  });
+
+  const linePath = coords.map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' ');
+  const areaPath = `${linePath} L${coords[coords.length - 1].x.toFixed(1)},${(padTop + plotH).toFixed(1)} L${coords[0].x.toFixed(1)},${(padTop + plotH).toFixed(1)} Z`;
+
+  const dots = coords.filter((c) => c.val > 0).map((c) => `
+    <circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="3.5" fill="var(--accent-primary)">
+      <title>يوم ${c.day}: ${formatMoney(c.val, currency)}</title>
+    </circle>
+  `).join('');
+
+  const ticks = [1, 10, 20, daysInMonth].map((d) => {
+    const c = coords[d - 1];
+    return `<text x="${c.x.toFixed(1)}" y="${height - 8}" text-anchor="middle" fill="var(--text-muted)" font-size="11">يوم ${d}</text>`;
+  }).join('');
+
+  return `
+    <div class="chart-wrap">
+      <svg viewBox="0 0 ${width} ${height}" style="width:100%;height:auto;max-height:210px;" role="img" aria-label="منحنى الصرف اليومي">
+        <line x1="${padX}" y1="${padTop + plotH}" x2="${width - padX}" y2="${padTop + plotH}" stroke="var(--border-subtle)" stroke-width="1"/>
+        <path d="${areaPath}" fill="var(--accent-primary)" fill-opacity="0.12"/>
+        <path d="${linePath}" fill="none" stroke="var(--accent-primary)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+        ${dots}
+        ${ticks}
+      </svg>
     </div>
   `;
 }

@@ -1,14 +1,15 @@
-// Mizan Finance — Main Application Controller, Router & Modals
+// Mizan Finance v2.0 — Main Application Controller, Native-Style Modals & Router
 
 import { icon } from './icons.js';
 import {
-  esc, todayISO, showToast, downloadFile,
-  EXPENSE_CATEGORIES, INCOME_CATEGORIES, ACCOUNT_TYPES
+  esc, todayISO, currentMonthKey, showToast, downloadFile, formatMoney,
+  ACCOUNT_TYPES
 } from './utils.js';
 import {
-  getState, subscribe, updateProfile,
+  getState, subscribe, updateProfile, shiftMonthKey,
+  getAllCategories, addCustomCategory, removeCustomCategory,
   addAccount, updateAccountBalance, deleteAccount,
-  addTransaction, deleteTransaction,
+  addTransaction, updateTransaction, deleteTransaction,
   upsertBudget, deleteBudget,
   addRecurring, payRecurringNow, deleteRecurring,
   addGoal, contributeGoal, deleteGoal,
@@ -27,10 +28,12 @@ import {
   renderAdvisorView,
   renderSettingsView
 } from './views.js';
-import { askAdvisor } from './ai-engine.js';
+import { askAdvisor, applySmartAutoBudgets, generateFinancialPlan } from './ai-engine.js';
 
 let currentRoute = 'dashboard';
+let activeMonth = currentMonthKey();
 const txFilters = { q: '', type: '', accountId: '', month: '' };
+const simState = { cutPct: 10 };
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'الرئيسية', icon: 'home', mobile: true },
@@ -43,19 +46,21 @@ const NAV_ITEMS = [
   { id: 'settings', label: 'الإعدادات', icon: 'settings', mobile: false }
 ];
 
-function applyTheme(theme) {
-  document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : 'light');
+function applyVisualModes(profile) {
+  document.documentElement.setAttribute('data-theme', profile.theme === 'dark' ? 'dark' : 'light');
+  document.body.classList.toggle('privacy-blur', Boolean(profile.privacyMode));
   const meta = document.getElementById('meta-theme-color');
-  if (meta) meta.setAttribute('content', theme === 'dark' ? '#0E1114' : '#F6F5F1');
+  if (meta) meta.setAttribute('content', profile.theme === 'dark' ? '#0E1114' : '#F6F5F1');
 }
 
 function renderApp() {
   const state = getState();
-  applyTheme(state.profile.theme);
+  applyVisualModes(state.profile);
 
   if (!state.profile.onboarded) {
     renderOnboarding(() => {
       currentRoute = 'dashboard';
+      activeMonth = currentMonthKey();
       renderApp();
     });
     return;
@@ -67,13 +72,14 @@ function renderApp() {
     case 'accounts':     viewHtml = renderAccountsView(); break;
     case 'budgets':      viewHtml = renderBudgetsView(); break;
     case 'goals':        viewHtml = renderGoalsView(); break;
-    case 'analytics':    viewHtml = renderAnalyticsView(); break;
-    case 'advisor':      viewHtml = renderAdvisorView(); break;
+    case 'analytics':    viewHtml = renderAnalyticsView(activeMonth); break;
+    case 'advisor':      viewHtml = renderAdvisorView(simState); break;
     case 'settings':     viewHtml = renderSettingsView(); break;
-    default:             viewHtml = renderDashboardView();
+    default:             viewHtml = renderDashboardView(activeMonth);
   }
 
   const initial = (state.profile.name || 'م').trim().charAt(0);
+  const priv = Boolean(state.profile.privacyMode);
 
   const app = document.getElementById('app');
   app.innerHTML = `
@@ -82,7 +88,8 @@ function renderApp() {
         <div class="brand-mark" style="width:32px;height:32px;">${icon('scale', 17)}</div>
         <span style="font-weight:700;font-size:16px;">ميزان</span>
       </div>
-      <div style="display:flex;gap:8px;">
+      <div style="display:flex;gap:6px;">
+        <button class="btn-icon ${priv ? 'active' : ''}" style="width:38px;height:38px;" data-action="toggle-privacy" aria-label="وضع الخصوصية">${icon(priv ? 'eyeOff' : 'eye', 17)}</button>
         <button class="btn-icon" style="width:38px;height:38px;" data-nav="budgets" aria-label="الميزانيات">${icon('pie', 17)}</button>
         <button class="btn-icon" style="width:38px;height:38px;" data-nav="goals" aria-label="الأهداف والديون">${icon('target', 17)}</button>
         <button class="btn-icon" style="width:38px;height:38px;" data-nav="settings" aria-label="الإعدادات">${icon('settings', 17)}</button>
@@ -92,11 +99,16 @@ function renderApp() {
     <div class="app-shell">
       <aside class="sidebar" aria-label="القائمة الرئيسية">
         <div class="brand-header">
-          <div class="brand-mark">${icon('scale', 20)}</div>
-          <div>
-            <div class="brand-title">ميزان</div>
-            <div class="brand-subtitle">إدارة مالية ذكية</div>
+          <div class="brand-left">
+            <div class="brand-mark">${icon('scale', 20)}</div>
+            <div>
+              <div class="brand-title">ميزان</div>
+              <div class="brand-subtitle">إدارة مالية ذكية</div>
+            </div>
           </div>
+          <button class="btn-icon ${priv ? 'active' : ''}" style="width:36px;height:36px;" data-action="toggle-privacy" title="${priv ? 'إظهار الأرقام' : 'إخفاء الأرقام'}" aria-label="وضع الخصوصية">
+            ${icon(priv ? 'eyeOff' : 'eye', 16)}
+          </button>
         </div>
 
         <ul class="nav-list">
@@ -127,6 +139,8 @@ function renderApp() {
       <main class="main-content">${viewHtml}</main>
     </div>
 
+    <button class="fab-add" data-action="open-modal" data-modal="transaction" aria-label="إضافة معاملة سريعة">${icon('plus', 24)}</button>
+
     <nav class="bottom-nav" aria-label="التنقل السريع">
       ${NAV_ITEMS.filter((i) => i.mobile).map((item) => `
         <button class="bottom-nav-btn ${currentRoute === item.id ? 'active' : ''}" data-nav="${item.id}">
@@ -141,6 +155,22 @@ function renderApp() {
 }
 
 function bindViewSpecificHandlers() {
+  if (currentRoute === 'dashboard') {
+    const qaForm = document.getElementById('quick-add-form');
+    if (qaForm) {
+      qaForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const amount = Number(document.getElementById('qa-amount').value);
+        if (amount <= 0) return;
+        const category = document.getElementById('qa-cat').value;
+        const accountId = document.getElementById('qa-acc')?.value || '';
+        const note = document.getElementById('qa-note').value;
+        addTransaction({ type: 'expense', amount, category, accountId, date: todayISO(), note });
+        showToast('تم تسجيل المصروف السريع');
+      });
+    }
+  }
+
   if (currentRoute === 'transactions') {
     const bind = (id, key) => {
       const el = document.getElementById(id);
@@ -163,6 +193,7 @@ function bindViewSpecificHandlers() {
   if (currentRoute === 'advisor') {
     const box = document.getElementById('ai-chat-messages');
     if (box) box.scrollTop = box.scrollHeight;
+
     const form = document.getElementById('ai-chat-form');
     if (form) {
       form.addEventListener('submit', async (e) => {
@@ -172,6 +203,22 @@ function bindViewSpecificHandlers() {
         if (!q) return;
         input.value = '';
         await handleAdvisorQuestion(q);
+      });
+    }
+
+    const slider = document.getElementById('sim-cut-range');
+    if (slider) {
+      slider.addEventListener('input', (e) => {
+        simState.cutPct = Number(e.target.value) || 0;
+        const state = getState();
+        const cur = state.profile.currency || 'SAR';
+        const plan = generateFinancialPlan(currentMonthKey());
+        const baseExp = plan.summary.monthExpense > 0 ? plan.summary.monthExpense : plan.allocation.wants;
+        const monthly = Math.round((baseExp * simState.cutPct) / 100) + Math.max(0, plan.allocation.savings);
+        document.getElementById('sim-pct-label').textContent = `${simState.cutPct}%`;
+        document.getElementById('sim-monthly').textContent = formatMoney(monthly, cur);
+        document.getElementById('sim-yearly').textContent = formatMoney(monthly * 12, cur);
+        document.getElementById('sim-3yr').textContent = formatMoney(monthly * 36, cur);
       });
     }
   }
@@ -189,6 +236,20 @@ function bindViewSpecificHandlers() {
           geminiApiKey: document.getElementById('set-apikey').value.trim()
         });
         showToast('تم حفظ الإعدادات بنجاح');
+      });
+    }
+
+    const catForm = document.getElementById('custom-cat-form');
+    if (catForm) {
+      catForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const type = document.getElementById('cc-type').value;
+        const name = document.getElementById('cc-name').value.trim();
+        if (addCustomCategory(type, name)) {
+          showToast(`تمت إضافة فئة "${name}"`);
+        } else {
+          showToast('هذه الفئة موجودة مسبقاً');
+        }
       });
     }
 
@@ -233,19 +294,66 @@ function closeModal() {
   document.getElementById('modal-container').innerHTML = '';
 }
 
-function showTransactionModal(defaultType = 'expense') {
+function showConfirmModal({ title, message, confirmLabel = 'تأكيد', danger = false, onConfirm }) {
+  openModal(`
+    <div class="modal-header">
+      <h2 class="modal-title">${esc(title)}</h2>
+      <button class="btn-icon" style="width:36px;height:36px;" data-action="close-modal" aria-label="إغلاق">${icon('close', 18)}</button>
+    </div>
+    <p style="font-size:14px;color:var(--text-secondary);line-height:1.7;">${esc(message)}</p>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" data-action="close-modal">إلغاء</button>
+      <button type="button" id="confirm-modal-ok" class="btn ${danger ? 'btn-danger' : 'btn-primary'}">${esc(confirmLabel)}</button>
+    </div>
+  `);
+  document.getElementById('confirm-modal-ok').addEventListener('click', () => {
+    closeModal();
+    onConfirm();
+  });
+}
+
+function showNumberModal({ title, label, initialValue = '', submitLabel = 'حفظ', onSubmit }) {
+  openModal(`
+    <div class="modal-header">
+      <h2 class="modal-title">${esc(title)}</h2>
+      <button class="btn-icon" style="width:36px;height:36px;" data-action="close-modal" aria-label="إغلاق">${icon('close', 18)}</button>
+    </div>
+    <form id="num-modal-form" class="stack-md">
+      <div class="form-group">
+        <label class="form-label" for="num-modal-val">${esc(label)}</label>
+        <input id="num-modal-val" class="form-input num" type="number" inputmode="decimal" step="any" required value="${esc(initialValue)}" placeholder="0">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-action="close-modal">إلغاء</button>
+        <button type="submit" class="btn btn-primary">${icon('check', 16)} ${esc(submitLabel)}</button>
+      </div>
+    </form>
+  `);
+  const input = document.getElementById('num-modal-val');
+  input?.focus();
+  document.getElementById('num-modal-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const val = Number(input.value);
+    if (!Number.isNaN(val)) {
+      closeModal();
+      onSubmit(val);
+    }
+  });
+}
+
+function showTransactionModal(defaultType = 'expense', editTx = null) {
   const state = getState();
-  let txType = defaultType;
+  let txType = editTx ? editTx.type : defaultType;
 
   const renderForm = () => {
-    const cats = txType === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
-    const accOpts = state.accounts.length
-      ? state.accounts.map((a) => `<option value="${a.id}">${esc(a.name)}</option>`).join('')
+    const cats = getAllCategories(txType === 'income' ? 'income' : 'expense');
+    const accOpts = (selectedId) => state.accounts.length
+      ? state.accounts.map((a) => `<option value="${a.id}" ${selectedId === a.id ? 'selected' : ''}>${esc(a.name)}</option>`).join('')
       : `<option value="">بدون حساب (أضف حساباً لاحقاً)</option>`;
 
     openModal(`
       <div class="modal-header">
-        <h2 class="modal-title">إضافة معاملة جديدة</h2>
+        <h2 class="modal-title">${editTx ? 'تعديل المعاملة' : 'إضافة معاملة جديدة'}</h2>
         <button class="btn-icon" style="width:36px;height:36px;" data-action="close-modal" aria-label="إغلاق">${icon('close', 18)}</button>
       </div>
       <form id="modal-tx-form" class="stack-md">
@@ -258,11 +366,11 @@ function showTransactionModal(defaultType = 'expense') {
         <div class="form-grid">
           <div class="form-group">
             <label class="form-label" for="tx-amount">المبلغ</label>
-            <input id="tx-amount" class="form-input num" type="number" inputmode="decimal" min="0.01" step="any" required placeholder="0.00">
+            <input id="tx-amount" class="form-input num" type="number" inputmode="decimal" min="0.01" step="any" required placeholder="0.00" value="${editTx ? esc(editTx.amount) : ''}">
           </div>
           <div class="form-group">
             <label class="form-label" for="tx-date">التاريخ</label>
-            <input id="tx-date" class="form-input" type="date" required value="${todayISO()}">
+            <input id="tx-date" class="form-input" type="date" required value="${editTx ? esc(editTx.date) : todayISO()}">
           </div>
         </div>
 
@@ -270,34 +378,34 @@ function showTransactionModal(defaultType = 'expense') {
           <div class="form-grid">
             <div class="form-group">
               <label class="form-label" for="tx-cat">الفئة</label>
-              <select id="tx-cat" class="form-select">${cats.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select>
+              <select id="tx-cat" class="form-select">${cats.map((c) => `<option value="${esc(c)}" ${editTx?.category === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>
             </div>
             <div class="form-group">
               <label class="form-label" for="tx-acc">الحساب</label>
-              <select id="tx-acc" class="form-select">${accOpts}</select>
+              <select id="tx-acc" class="form-select">${accOpts(editTx?.accountId)}</select>
             </div>
           </div>
         ` : `
           <div class="form-grid">
             <div class="form-group">
               <label class="form-label" for="tx-acc">من حساب</label>
-              <select id="tx-acc" class="form-select">${accOpts}</select>
+              <select id="tx-acc" class="form-select">${accOpts(editTx?.accountId)}</select>
             </div>
             <div class="form-group">
               <label class="form-label" for="tx-to-acc">إلى حساب</label>
-              <select id="tx-to-acc" class="form-select">${accOpts}</select>
+              <select id="tx-to-acc" class="form-select">${accOpts(editTx?.toAccountId)}</select>
             </div>
           </div>
         `}
 
         <div class="form-group">
           <label class="form-label" for="tx-note">وصف أو ملاحظة (اختياري)</label>
-          <input id="tx-note" class="form-input" type="text" placeholder="مثال: قهوة، راتب، فاتورة كهرباء...">
+          <input id="tx-note" class="form-input" type="text" placeholder="مثال: قهوة، راتب، فاتورة كهرباء..." value="${editTx ? esc(editTx.note) : ''}">
         </div>
 
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-action="close-modal">إلغاء</button>
-          <button type="submit" class="btn btn-primary">${icon('check', 16)} حفظ المعاملة</button>
+          <button type="submit" class="btn btn-primary">${icon('check', 16)} ${editTx ? 'حفظ التعديلات' : 'حفظ المعاملة'}</button>
         </div>
       </form>
     `);
@@ -311,20 +419,29 @@ function showTransactionModal(defaultType = 'expense') {
 
     document.getElementById('modal-tx-form').addEventListener('submit', (e) => {
       e.preventDefault();
-      const amount = Number(document.getElementById('tx-amount').value);
-      const date = document.getElementById('tx-date').value;
-      const accountId = document.getElementById('tx-acc')?.value || '';
-      const toAccountId = document.getElementById('tx-to-acc')?.value || '';
-      const category = document.getElementById('tx-cat')?.value || 'تحويل بين الحسابات';
-      const note = document.getElementById('tx-note').value;
+      const payload = {
+        type: txType,
+        amount: Number(document.getElementById('tx-amount').value),
+        date: document.getElementById('tx-date').value,
+        accountId: document.getElementById('tx-acc')?.value || '',
+        toAccountId: document.getElementById('tx-to-acc')?.value || '',
+        category: document.getElementById('tx-cat')?.value || 'تحويل بين الحسابات',
+        note: document.getElementById('tx-note').value
+      };
 
-      if (txType === 'transfer' && (!accountId || !toAccountId || accountId === toAccountId)) {
+      if (txType === 'transfer' && (!payload.accountId || !payload.toAccountId || payload.accountId === payload.toAccountId)) {
         showToast('اختر حسابين مختلفين للتحويل');
         return;
       }
-      addTransaction({ type: txType, amount, category, accountId, toAccountId, date, note });
+
+      if (editTx) {
+        updateTransaction(editTx.id, payload);
+        showToast('تم تحديث المعاملة والرصيد');
+      } else {
+        addTransaction(payload);
+        showToast('تم تسجيل المعاملة وتحديث الرصيد');
+      }
       closeModal();
-      showToast('تم تسجيل المعاملة وتحديث الرصيد');
     });
   };
 
@@ -379,6 +496,7 @@ function showAccountModal() {
 }
 
 function showBudgetModal() {
+  const cats = getAllCategories('expense');
   openModal(`
     <div class="modal-header">
       <h2 class="modal-title">تحديد ميزانية شهرية لفئة</h2>
@@ -388,7 +506,7 @@ function showBudgetModal() {
       <div class="form-group">
         <label class="form-label" for="bud-cat">الفئة</label>
         <select id="bud-cat" class="form-select">
-          ${EXPENSE_CATEGORIES.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join('')}
+          ${cats.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join('')}
         </select>
       </div>
       <div class="form-group">
@@ -415,6 +533,7 @@ function showBudgetModal() {
 
 function showRecurringModal() {
   const state = getState();
+  const cats = getAllCategories('expense');
   openModal(`
     <div class="modal-header">
       <h2 class="modal-title">إضافة التزام أو اشتراك متكرر</h2>
@@ -438,7 +557,7 @@ function showRecurringModal() {
       <div class="form-grid">
         <div class="form-group">
           <label class="form-label" for="rec-cat">الفئة</label>
-          <select id="rec-cat" class="form-select">${EXPENSE_CATEGORIES.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select>
+          <select id="rec-cat" class="form-select">${cats.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select>
         </div>
         <div class="form-group">
           <label class="form-label" for="rec-acc">الحساب المرتبط</label>
@@ -591,30 +710,73 @@ document.addEventListener('click', async (e) => {
       else if (m === 'debt') showDebtModal();
       break;
     }
+    case 'shift-month': {
+      const delta = Number(actionEl.dataset.delta) || 0;
+      activeMonth = shiftMonthKey(activeMonth, delta);
+      renderApp();
+      break;
+    }
     case 'toggle-theme': {
       const cur = getState().profile.theme;
       updateProfile({ theme: cur === 'dark' ? 'light' : 'dark' });
       break;
     }
+    case 'toggle-privacy': {
+      const priv = !getState().profile.privacyMode;
+      updateProfile({ privacyMode: priv });
+      showToast(priv ? 'تم تفعيل وضع الخصوصية وإخفاء الأرقام' : 'تم إظهار الأرقام');
+      break;
+    }
+    case 'edit-tx': {
+      const tx = getState().transactions.find((t) => t.id === id);
+      if (tx) showTransactionModal(tx.type, tx);
+      break;
+    }
     case 'delete-tx':
-      if (confirm('حذف هذه المعاملة وعكس أثرها على رصيد الحساب؟')) {
-        deleteTransaction(id);
-        showToast('تم حذف المعاملة');
-      }
+      showConfirmModal({
+        title: 'حذف المعاملة',
+        message: 'سيتم حذف هذه المعاملة وعكس أثرها على رصيد الحساب المرتبط تلقائياً.',
+        confirmLabel: 'حذف',
+        danger: true,
+        onConfirm: () => {
+          deleteTransaction(id);
+          showToast('تم حذف المعاملة');
+        }
+      });
       break;
     case 'delete-account':
-      if (confirm('حذف هذا الحساب؟')) {
-        deleteAccount(id);
-        showToast('تم حذف الحساب');
-      }
+      showConfirmModal({
+        title: 'حذف الحساب',
+        message: 'هل تريد حذف هذا الحساب من قائمة حساباتك؟',
+        confirmLabel: 'حذف الحساب',
+        danger: true,
+        onConfirm: () => {
+          deleteAccount(id);
+          showToast('تم حذف الحساب');
+        }
+      });
       break;
     case 'adjust-balance': {
       const acc = getState().accounts.find((a) => a.id === id);
       if (!acc) break;
-      const val = prompt(`أدخل الرصيد الجديد لحساب "${acc.name}":`, String(acc.balance));
-      if (val !== null && !Number.isNaN(Number(val))) {
-        updateAccountBalance(id, Number(val));
-        showToast('تم تحديث الرصيد');
+      showNumberModal({
+        title: `تعديل رصيد "${acc.name}"`,
+        label: 'أدخل الرصيد الفعلي الجديد',
+        initialValue: acc.balance,
+        submitLabel: 'تحديث الرصيد',
+        onSubmit: (val) => {
+          updateAccountBalance(id, val);
+          showToast('تم تحديث الرصيد بنجاح');
+        }
+      });
+      break;
+    }
+    case 'auto-budgets': {
+      const res = applySmartAutoBudgets();
+      if (res.ok) {
+        showToast(`تم توليد ${res.count} ميزانيات ذكية بناءً على دخلك`);
+      } else {
+        showToast('أضف دخلك الشهري في الإعدادات أولاً لتوليد الميزانيات');
       }
       break;
     }
@@ -631,11 +793,19 @@ document.addEventListener('click', async (e) => {
       showToast('تم حذف الالتزام');
       break;
     case 'contribute-goal': {
-      const val = prompt('أدخل المبلغ المضاف لهذا الهدف:');
-      if (val !== null && Number(val) > 0) {
-        contributeGoal(id, Number(val));
-        showToast('تم تحديث تقدم الهدف');
-      }
+      const g = getState().goals.find((x) => x.id === id);
+      if (!g) break;
+      showNumberModal({
+        title: `إضافة مبلغ لهدف "${g.title}"`,
+        label: 'المبلغ المضاف للادخار',
+        submitLabel: 'إضافة للهدف',
+        onSubmit: (val) => {
+          if (val > 0) {
+            contributeGoal(id, val);
+            showToast('تم تحديث تقدم الهدف');
+          }
+        }
+      });
       break;
     }
     case 'delete-goal':
@@ -643,16 +813,28 @@ document.addEventListener('click', async (e) => {
       showToast('تم حذف الهدف');
       break;
     case 'pay-debt': {
-      const val = prompt('أدخل مبلغ الدفعة المسددة:');
-      if (val !== null && Number(val) > 0) {
-        recordDebtPayment(id, Number(val));
-        showToast('تم تسجيل الدفعة');
-      }
+      const d = getState().debts.find((x) => x.id === id);
+      if (!d) break;
+      showNumberModal({
+        title: `تسجيل دفعة — ${d.person}`,
+        label: 'قيمة الدفعة المسددة',
+        submitLabel: 'تسجيل الدفعة',
+        onSubmit: (val) => {
+          if (val > 0) {
+            recordDebtPayment(id, val);
+            showToast('تم تسجيل الدفعة وتحديث المتبقي');
+          }
+        }
+      });
       break;
     }
     case 'delete-debt':
       deleteDebt(id);
       showToast('تم حذف سجل الدين');
+      break;
+    case 'remove-cat':
+      removeCustomCategory(actionEl.dataset.type, actionEl.dataset.name);
+      showToast('تم حذف الفئة المخصصة');
       break;
     case 'quick-prompt':
       await handleAdvisorQuestion(actionEl.dataset.prompt || '');
@@ -675,11 +857,18 @@ document.addEventListener('click', async (e) => {
       break;
     }
     case 'reset-all':
-      if (confirm('هل أنت متأكد من مسح كل البيانات والبدء من جديد؟ لا يمكن التراجع عن هذا الإجراء.')) {
-        resetAllData();
-        currentRoute = 'dashboard';
-        showToast('تم تصفير جميع البيانات');
-      }
+      showConfirmModal({
+        title: 'تصفير جميع البيانات',
+        message: 'سيتم حذف جميع الحسابات والمعاملات والأهداف نهائياً والعودة لشاشة الاستبيان الأولى. لا يمكن التراجع عن هذا الإجراء.',
+        confirmLabel: 'نعم، مسح الكل',
+        danger: true,
+        onConfirm: () => {
+          resetAllData();
+          currentRoute = 'dashboard';
+          activeMonth = currentMonthKey();
+          showToast('تم تصفير جميع البيانات');
+        }
+      });
       break;
   }
 });

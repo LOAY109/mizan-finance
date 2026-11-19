@@ -1,12 +1,12 @@
-// LocalStorage State Store — STRICTLY ZERO DEMO / SAMPLE DATA
+// LocalStorage State Store v2.0 — STRICTLY ZERO DEMO / SAMPLE DATA
 
-import { uid, currentMonthKey } from './utils.js';
+import { uid, currentMonthKey, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from './utils.js';
 
 const STORAGE_KEY = 'mizan_finance_state_v1';
 
 export function createCleanState() {
   return {
-    version: 1,
+    version: 2,
     profile: {
       onboarded: false,
       name: '',
@@ -17,7 +17,12 @@ export function createCleanState() {
       financialGoal: 'save',
       budgetRule: '50_30_20',
       theme: 'light',
+      privacyMode: false,
       geminiApiKey: ''
+    },
+    customCategories: {
+      expense: [],
+      income: []
     },
     accounts: [],
     transactions: [],
@@ -42,6 +47,10 @@ function loadState() {
       ...base,
       ...parsed,
       profile: { ...base.profile, ...(parsed.profile || {}) },
+      customCategories: {
+        expense: Array.isArray(parsed.customCategories?.expense) ? parsed.customCategories.expense : [],
+        income: Array.isArray(parsed.customCategories?.income) ? parsed.customCategories.income : []
+      },
       accounts: Array.isArray(parsed.accounts) ? parsed.accounts : [],
       transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
       budgets: Array.isArray(parsed.budgets) ? parsed.budgets : [],
@@ -78,6 +87,30 @@ export function updateProfile(patch) {
   saveAndNotify();
 }
 
+export function getAllCategories(type = 'expense') {
+  const base = type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+  const custom = state.customCategories?.[type] || [];
+  return [...new Set([...base, ...custom])];
+}
+
+export function addCustomCategory(type, name) {
+  const clean = name.trim();
+  if (!clean) return false;
+  const list = state.customCategories[type === 'income' ? 'income' : 'expense'];
+  if (!list.includes(clean)) {
+    list.push(clean);
+    saveAndNotify();
+    return true;
+  }
+  return false;
+}
+
+export function removeCustomCategory(type, name) {
+  const key = type === 'income' ? 'income' : 'expense';
+  state.customCategories[key] = state.customCategories[key].filter((c) => c !== name);
+  saveAndNotify();
+}
+
 export function addAccount({ name, type, balance, notes = '' }) {
   const acc = {
     id: uid('acc'),
@@ -104,6 +137,19 @@ export function deleteAccount(id) {
   saveAndNotify();
 }
 
+function applyTxToAccounts(tx, multiplier = 1) {
+  const amt = (Number(tx.amount) || 0) * multiplier;
+  const src = state.accounts.find((a) => a.id === tx.accountId);
+  if (!src) return;
+  if (tx.type === 'income') src.balance += amt;
+  if (tx.type === 'expense') src.balance -= amt;
+  if (tx.type === 'transfer') {
+    src.balance -= amt;
+    const dst = state.accounts.find((a) => a.id === tx.toAccountId);
+    if (dst) dst.balance += amt;
+  }
+}
+
 export function addTransaction({ type, amount, category, accountId, toAccountId = null, date, note = '' }) {
   const amt = Math.abs(Number(amount) || 0);
   if (amt <= 0) return null;
@@ -120,18 +166,29 @@ export function addTransaction({ type, amount, category, accountId, toAccountId 
     createdAt: new Date().toISOString()
   };
 
-  const src = state.accounts.find((a) => a.id === tx.accountId);
-  if (src) {
-    if (tx.type === 'income') src.balance += amt;
-    if (tx.type === 'expense') src.balance -= amt;
-    if (tx.type === 'transfer') {
-      src.balance -= amt;
-      const dst = state.accounts.find((a) => a.id === tx.toAccountId);
-      if (dst) dst.balance += amt;
-    }
-  }
-
+  applyTxToAccounts(tx, 1);
   state.transactions.unshift(tx);
+  state.transactions.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || '').localeCompare(a.createdAt || ''));
+  saveAndNotify();
+  return tx;
+}
+
+export function updateTransaction(id, patch) {
+  const tx = state.transactions.find((t) => t.id === id);
+  if (!tx) return null;
+  applyTxToAccounts(tx, -1);
+
+  const amt = Math.abs(Number(patch.amount) || tx.amount);
+  tx.type = patch.type || tx.type;
+  tx.amount = amt;
+  tx.category = tx.type === 'transfer' ? 'تحويل بين الحسابات' : (patch.category || tx.category);
+  tx.accountId = patch.accountId ?? tx.accountId;
+  tx.toAccountId = tx.type === 'transfer' ? (patch.toAccountId || null) : null;
+  tx.date = patch.date || tx.date;
+  tx.note = (patch.note ?? tx.note).trim();
+
+  applyTxToAccounts(tx, 1);
+  state.transactions.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || '').localeCompare(a.createdAt || ''));
   saveAndNotify();
   return tx;
 }
@@ -139,19 +196,7 @@ export function addTransaction({ type, amount, category, accountId, toAccountId 
 export function deleteTransaction(id) {
   const idx = state.transactions.findIndex((t) => t.id === id);
   if (idx === -1) return;
-  const tx = state.transactions[idx];
-
-  const src = state.accounts.find((a) => a.id === tx.accountId);
-  if (src) {
-    if (tx.type === 'income') src.balance -= tx.amount;
-    if (tx.type === 'expense') src.balance += tx.amount;
-    if (tx.type === 'transfer') {
-      src.balance += tx.amount;
-      const dst = state.accounts.find((a) => a.id === tx.toAccountId);
-      if (dst) dst.balance -= tx.amount;
-    }
-  }
-
+  applyTxToAccounts(state.transactions[idx], -1);
   state.transactions.splice(idx, 1);
   saveAndNotify();
 }
@@ -282,7 +327,11 @@ export function importBackupJSON(jsonString) {
   state = {
     ...base,
     ...parsed,
-    profile: { ...base.profile, ...(parsed.profile || {}) }
+    profile: { ...base.profile, ...(parsed.profile || {}) },
+    customCategories: {
+      expense: Array.isArray(parsed.customCategories?.expense) ? parsed.customCategories.expense : [],
+      income: Array.isArray(parsed.customCategories?.income) ? parsed.customCategories.income : []
+    }
   };
   saveAndNotify();
 }
@@ -293,9 +342,19 @@ export function resetAllData() {
   listeners.forEach((fn) => fn(state));
 }
 
+export function shiftMonthKey(monthKey, delta) {
+  const [y, m] = monthKey.split('-').map(Number);
+  const d = new Date(y, (m || 1) - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
 export function getFinancialSummary(monthKey = currentMonthKey()) {
   const totalBalance = state.accounts.reduce((s, a) => s + (Number(a.balance) || 0), 0);
   const monthTxs = state.transactions.filter((t) => (t.date || '').startsWith(monthKey));
+
+  const prevKey = shiftMonthKey(monthKey, -1);
+  const prevTxs = state.transactions.filter((t) => (t.date || '').startsWith(prevKey));
+  const prevMonthExpense = prevTxs.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
 
   const monthIncome = monthTxs
     .filter((t) => t.type === 'income')
@@ -305,10 +364,13 @@ export function getFinancialSummary(monthKey = currentMonthKey()) {
     .reduce((s, t) => s + t.amount, 0);
 
   const byCategory = {};
+  const byDay = {};
   monthTxs
     .filter((t) => t.type === 'expense')
     .forEach((t) => {
       byCategory[t.category] = (byCategory[t.category] || 0) + t.amount;
+      const day = Number((t.date || '').slice(8, 10));
+      if (day >= 1 && day <= 31) byDay[day] = (byDay[day] || 0) + t.amount;
     });
 
   const owedByMe = state.debts
@@ -321,14 +383,22 @@ export function getFinancialSummary(monthKey = currentMonthKey()) {
   const netWorth = totalBalance + owedToMe - owedByMe;
   const monthlyRecurringTotal = state.recurring.reduce((s, r) => s + r.amount, 0);
 
+  const expenseDeltaPct = prevMonthExpense > 0
+    ? Math.round(((monthExpense - prevMonthExpense) / prevMonthExpense) * 100)
+    : null;
+
   return {
+    monthKey,
     totalBalance,
     netWorth,
     monthIncome,
     monthExpense,
+    prevMonthExpense,
+    expenseDeltaPct,
     monthNet: monthIncome - monthExpense,
     monthTxCount: monthTxs.length,
     byCategory,
+    byDay,
     owedByMe,
     owedToMe,
     monthlyRecurringTotal

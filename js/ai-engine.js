@@ -1,8 +1,6 @@
-// Dual Smart Financial Intelligence Engine
-// 1) Local real-time deterministic analysis & planning (works offline, strictly real user data)
-// 2) Optional live Gemini API advisor chat (user's own key stored locally on device)
+// Dual Smart Financial Intelligence Engine v2.0
 
-import { getState, getFinancialSummary } from './store.js';
+import { getState, getFinancialSummary, upsertBudget } from './store.js';
 import { formatMoney, currentMonthKey } from './utils.js';
 
 const RULES = {
@@ -12,20 +10,21 @@ const RULES = {
   'custom':   { name: 'توزيع مرن مخصص للادخار المكثف (50/20/30)', needs: 0.50, wants: 0.20, savings: 0.30 }
 };
 
-export function generateFinancialPlan() {
+export function generateFinancialPlan(monthKey = currentMonthKey()) {
   const state = getState();
   const { profile, accounts, transactions, budgets, goals } = state;
-  const summary = getFinancialSummary(currentMonthKey());
+  const summary = getFinancialSummary(monthKey);
   const cur = profile.currency || 'SAR';
 
   const baseIncome = summary.monthIncome > 0 ? summary.monthIncome : (Number(profile.monthlyIncome) || 0);
   const rule = RULES[profile.budgetRule] || RULES['50_30_20'];
-
   const hasData = accounts.length > 0 || transactions.length > 0 || baseIncome > 0;
 
   const now = new Date();
-  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  const daysLeft = Math.max(1, daysInMonth - now.getDate() + 1);
+  const isCurrentMonth = monthKey === currentMonthKey();
+  const [y, m] = monthKey.split('-').map(Number);
+  const daysInMonth = new Date(y, m || 1, 0).getDate();
+  const daysLeft = isCurrentMonth ? Math.max(1, daysInMonth - now.getDate() + 1) : 0;
 
   const allocation = {
     ruleName: rule.name,
@@ -37,7 +36,7 @@ export function generateFinancialPlan() {
 
   const plannedSpendCeiling = allocation.needs + allocation.wants;
   const remainingBudget = Math.max(0, plannedSpendCeiling - summary.monthExpense);
-  const safeDailySpend = baseIncome > 0 ? Math.round(remainingBudget / daysLeft) : 0;
+  const safeDailySpend = baseIncome > 0 && daysLeft > 0 ? Math.round(remainingBudget / daysLeft) : 0;
 
   const savingsRate = baseIncome > 0
     ? Math.round(((baseIncome - summary.monthExpense) / baseIncome) * 100)
@@ -75,11 +74,22 @@ export function generateFinancialPlan() {
       body: 'أضف حساباتك الحالية وأول معاملاتك، وسيقوم المحلل الذكي تلقائياً بحساب سقف الصرف اليومي وتقييم صحتك المالية.'
     });
   } else {
-    if (baseIncome > 0) {
+    if (baseIncome > 0 && isCurrentMonth) {
       insights.push({
         level: 'accent',
         title: `سقف الصرف اليومي الآمن: ${formatMoney(safeDailySpend, cur)}`,
-        body: `بناءً على دخلك (${formatMoney(baseIncome, cur)}) ومصاريفك المسجلة هذا الشهر (${formatMoney(summary.monthExpense, cur)})، هذا هو الحد اليومي الآمن لباقي ${daysLeft} يوم في الشهر لتحقيق هدف الادخار.`
+        body: `بناءً على دخلك (${formatMoney(baseIncome, cur)}) ومصاريفك المسجلة هذا الشهر (${formatMoney(summary.monthExpense, cur)})، هذا هو الحد اليومي الآمن لباقي ${daysLeft} يوم لتحقيق هدف الادخار.`
+      });
+    }
+
+    if (summary.expenseDeltaPct !== null) {
+      const up = summary.expenseDeltaPct > 0;
+      insights.push({
+        level: up && summary.expenseDeltaPct >= 15 ? 'warning' : 'info',
+        title: up
+          ? `مصاريفك ارتفعت ${summary.expenseDeltaPct}% مقارنة بالشهر الماضي`
+          : `ممتاز: مصاريفك أقل بـ ${Math.abs(summary.expenseDeltaPct)}% عن الشهر الماضي`,
+        body: `الشهر الماضي صرفت ${formatMoney(summary.prevMonthExpense, cur)}، بينما هذا الشهر ${formatMoney(summary.monthExpense, cur)}.`
       });
     }
 
@@ -87,8 +97,8 @@ export function generateFinancialPlan() {
       const share = Math.round((topCategory.amount / summary.monthExpense) * 100);
       insights.push({
         level: share >= 40 ? 'warning' : 'info',
-        title: `أعلى بند صرف هذا الشهر: ${topCategory.name} (${share}%)`,
-        body: `صرفت ${formatMoney(topCategory.amount, cur)} على "${topCategory.name}". ${share >= 40 ? 'يستحوذ هذا البند على نسبة كبيرة من مصاريفك — يُنصح بوضع ميزانية شهرية مخصصة له.' : 'توزيع جيد، استمر بمراقبته أسبوعياً.'}`
+        title: `أعلى بند صرف: ${topCategory.name} (${share}%)`,
+        body: `صرفت ${formatMoney(topCategory.amount, cur)} على "${topCategory.name}". ${share >= 40 ? 'يستحوذ هذا البند على نسبة كبيرة من مصاريفك — يُنصح بوضع ميزانية شهرية مخصصة له.' : 'توزيع متوازن، استمر بمراقبته أسبوعياً.'}`
       });
     }
 
@@ -97,7 +107,7 @@ export function generateFinancialPlan() {
       insights.push({
         level: 'danger',
         title: 'تنبيه اقتراب أو تجاوز الميزانية',
-        body: `الفئات التالية وصلت لحد التنبيه هذا الشهر: ${names}.`
+        body: `الفئات التالية وصلت لحد التنبيه: ${names}.`
       });
     }
 
@@ -127,7 +137,7 @@ export function generateFinancialPlan() {
         level: 'info',
         title: `صندوق الطوارئ المقترح (3 أشهر): ${formatMoney(emergencyTarget, cur)}`,
         body: summary.totalBalance >= emergencyTarget
-          ? 'سيولتك الحالية تغطي صندوق الطوارئ لـ 3 أشهر — وضع ممتاز ومستقر.'
+          ? 'سيولتك الحالية تغطي صندوق الطوارئ لـ 3 أشهر — وضع مستقر.'
           : `ينقصك ${formatMoney(Math.max(0, emergencyTarget - summary.totalBalance), cur)} للوصول لغطاء أمان يكفي 3 أشهر.`
       });
     }
@@ -150,18 +160,51 @@ export function generateFinancialPlan() {
   };
 }
 
+export function applySmartAutoBudgets() {
+  const plan = generateFinancialPlan(currentMonthKey());
+  const income = plan.allocation.baseIncome;
+  if (income <= 0) return { ok: false, count: 0 };
+
+  const spendable = plan.allocation.needs + plan.allocation.wants;
+  const split = [
+    { category: 'مقاضي وسوبرماركت', ratio: 0.24 },
+    { category: 'طعام ومقاهي', ratio: 0.16 },
+    { category: 'مواصلات ووقود', ratio: 0.14 },
+    { category: 'فواتير واتصالات', ratio: 0.12 },
+    { category: 'تسوق وملابس', ratio: 0.14 },
+    { category: 'ترفيه وسفر', ratio: 0.10 }
+  ];
+
+  let count = 0;
+  split.forEach((item) => {
+    const limit = Math.max(50, Math.round((spendable * item.ratio) / 50) * 50);
+    upsertBudget({ category: item.category, limit });
+    count++;
+  });
+
+  return { ok: true, count };
+}
+
 function answerLocally(question) {
   const state = getState();
-  const plan = generateFinancialPlan();
+  const plan = generateFinancialPlan(currentMonthKey());
   const cur = state.profile.currency || 'SAR';
   const q = question.trim();
 
+  if (/مقارنة|الشهر الماضي|سابق|فرق/.test(q)) {
+    if (plan.summary.prevMonthExpense <= 0) {
+      return 'لا توجد مصاريف مسجلة في الشهر الماضي للمقارنة حتى الآن. بمجرد وجود بيانات لشهرين متتاليين سأحسب لك نسبة التغير وأسبابها.';
+    }
+    const diff = plan.summary.monthExpense - plan.summary.prevMonthExpense;
+    return `مقارنة الشهر الحالي بالشهر الماضي:\n• مصاريف الشهر الماضي: ${formatMoney(plan.summary.prevMonthExpense, cur)}\n• مصاريف هذا الشهر: ${formatMoney(plan.summary.monthExpense, cur)}\n• الفرق: ${diff >= 0 ? `زيادة بـ ${formatMoney(diff, cur)}` : `توفير بـ ${formatMoney(Math.abs(diff), cur)}`} (${plan.summary.expenseDeltaPct >= 0 ? '+' : ''}${plan.summary.expenseDeltaPct}%).`;
+  }
+
   if (/صرف|مصاريفي|تحليل|هذا الشهر/.test(q)) {
     if (plan.summary.monthTxCount === 0) {
-      return `ما سجّلت أي معاملات في هذا الشهر حتى الآن يا ${state.profile.name || 'صديقي'}. أضف أول مصروف أو دخل من زر "+ معاملة جديدة" وسأحلل لك أرقامك الحقيقية فوراً.`;
+      return `ما سجّلت أي معاملات في هذا الشهر حتى الآن يا ${state.profile.name || 'صديقي'}. أضف أول مصروف أو دخل من الشريط السريع في الرئيسية وسأحلل لك أرقامك الحقيقية فوراً.`;
     }
     const topTxt = plan.topCategory
-      ? `أعلى بند صرف عندك هو "${plan.topCategory.name}" بقيمة ${formatMoney(plan.topCategory.amount, cur)}.`
+      ? `• أعلى بند صرف: "${plan.topCategory.name}" بقيمة ${formatMoney(plan.topCategory.amount, cur)}`
       : '';
     return `ملخصك الحقيقي لهذا الشهر:\n• إجمالي الدخل المسجل: ${formatMoney(plan.summary.monthIncome, cur)}\n• إجمالي المصاريف: ${formatMoney(plan.summary.monthExpense, cur)}\n• الصافي: ${formatMoney(plan.summary.monthNet, cur)}\n${topTxt}\n• سقف الصرف اليومي الآمن لباقي ${plan.daysLeft} يوم: ${formatMoney(plan.safeDailySpend, cur)}.`;
   }
@@ -170,14 +213,20 @@ function answerLocally(question) {
     if (plan.allocation.baseIncome <= 0) {
       return 'حدد دخلك الشهري في صفحة الإعدادات (أو سجّل أول دخل لك) عشان أبني لك خطة توزيع دقيقة بأرقامك.';
     }
-    return `بناءً على دخلك (${formatMoney(plan.allocation.baseIncome, cur)}) وأسلوب "${plan.allocation.ruleName}":\n• الاحتياجات الأساسية: ${formatMoney(plan.allocation.needs, cur)}\n• المصاريف المرنة والترفيه: ${formatMoney(plan.allocation.wants, cur)}\n• الادخار والأهداف: ${formatMoney(plan.allocation.savings, cur)}\n\nنصيحة عملية: حوّل مبلغ الادخار فور نزول الراتب لحساب ادخار مستقل قبل ما تبدأ الصرف.`;
+    return `بناءً على دخلك (${formatMoney(plan.allocation.baseIncome, cur)}) وأسلوب "${plan.allocation.ruleName}":\n• الاحتياجات الأساسية: ${formatMoney(plan.allocation.needs, cur)}\n• المصاريف المرنة والترفيه: ${formatMoney(plan.allocation.wants, cur)}\n• الادخار والأهداف: ${formatMoney(plan.allocation.savings, cur)}\n\nتقدر أيضاً تضغط زر "توليد ميزانيات ذكية" في صفحة الميزانيات لتطبيق هذه الحدود على فئاتك تلقائياً.`;
   }
 
   if (/ديون|دين|سداد/.test(q)) {
     if (plan.summary.owedByMe <= 0 && plan.summary.owedToMe <= 0) {
       return 'سجل الديون عندك نظيف حالياً (ما فيه ديون مسجلة عليك أو لك). إذا عندك التزامات ودّك ترتب سدادها، أضفها من صفحة "الأهداف والديون".';
     }
-    return `وضع الديون المسجل عندك:\n• إجمالي الديون اللي عليك: ${formatMoney(plan.summary.owedByMe, cur)}\n• إجمالي المبالغ اللي لك عند الغير: ${formatMoney(plan.summary.owedToMe, cur)}\n\nأفضل استراتيجية عملية: ابدأ بسداد أصغر دين بالكامل لإغلاقه سريعاً (أسلوب كرة الثلج) أو ركّز على الدين الأعلى أولوية بمبلغ شهري ثابت.`;
+    return `وضع الديون المسجل عندك:\n• إجمالي الديون اللي عليك: ${formatMoney(plan.summary.owedByMe, cur)}\n• إجمالي المبالغ اللي لك عند الغير: ${formatMoney(plan.summary.owedToMe, cur)}\n\nأفضل استراتيجية عملية: ابدأ بسداد أصغر دين بالكامل لإغلاقه سريعاً (أسلوب كرة الثلج) أو خصّص 15% من دخلك شهرياً للسداد المنتظم.`;
+  }
+
+  if (/طوارئ|امان|أمان/.test(q)) {
+    const monthlyBase = plan.summary.monthExpense > 0 ? plan.summary.monthExpense : plan.allocation.needs;
+    if (monthlyBase <= 0) return 'أضف دخلك أو مصاريفك الشهرية لأحسب لك حجم صندوق الطوارئ المثالي لوضعك.';
+    return `صندوق الطوارئ المقترح لك:\n• حد أدنى (3 أشهر): ${formatMoney(monthlyBase * 3, cur)}\n• حد مثالي (6 أشهر): ${formatMoney(monthlyBase * 6, cur)}\n• رصيدك الحالي: ${formatMoney(plan.summary.totalBalance, cur)}.`;
   }
 
   if (/زكاة|زكاتي/.test(q)) {
@@ -198,7 +247,7 @@ function answerLocally(question) {
     plan.allocation.baseIncome > 0 ? `• هدف الادخار الشهري المقترح: ${formatMoney(plan.allocation.savings, cur)}` : null,
     plan.score !== null ? `• مؤشر الصحة المالية: ${plan.score} من 100` : null,
     '',
-    'تقدر تسألني عن: "تحليل مصاريفي هذا الشهر"، "خطة ادخار"، "كم أقدر أصرف يومياً؟"، أو "حساب الزكاة". ولإجابات محادثة مفتوحة أعمق، تقدر تربط مفتاح Gemini API مجاناً من الإعدادات.'
+    'تقدر تسألني عن: "تحليل مصاريفي"، "مقارنة الشهر الماضي"، "خطة ادخار"، "صندوق الطوارئ"، "كم أقدر أصرف يومياً؟"، أو "الزكاة".'
   ].filter((x) => x !== null);
   return lines.join('\n');
 }
@@ -211,18 +260,20 @@ export async function askAdvisor(question) {
     return answerLocally(question);
   }
 
-  const plan = generateFinancialPlan();
+  const plan = generateFinancialPlan(currentMonthKey());
   const contextPayload = {
     userName: state.profile.name,
     currency: state.profile.currency,
     monthlyIncome: plan.allocation.baseIncome,
     goal: state.profile.financialGoal,
     budgetRule: plan.allocation.ruleName,
-    accountsCount: state.accounts.length,
+    accounts: state.accounts.map((a) => ({ name: a.name, type: a.type, balance: a.balance })),
     totalBalance: plan.summary.totalBalance,
     netWorth: plan.summary.netWorth,
     monthIncome: plan.summary.monthIncome,
     monthExpense: plan.summary.monthExpense,
+    prevMonthExpense: plan.summary.prevMonthExpense,
+    expenseDeltaPct: plan.summary.expenseDeltaPct,
     topExpenseCategory: plan.topCategory,
     categoryBreakdown: plan.summary.byCategory,
     owedByMe: plan.summary.owedByMe,
@@ -233,7 +284,12 @@ export async function askAdvisor(question) {
     goals: state.goals.map((g) => ({ title: g.title, current: g.currentAmount, target: g.targetAmount }))
   };
 
-  const systemPrompt = `أنت مستشار مالي شخصي ذكي داخل تطبيق "ميزان". أجب بالعربية الواضحة والمختصرة والعملية (بلهجة مهذبة وطبيعية بدون مبالغة أو حشو). اعتمد حصرياً على أرقام المستخدم الحقيقية التالية ولا تخترع أي أرقام غير موجودة:\n${JSON.stringify(contextPayload)}`;
+  const systemPrompt = `أنت مستشار مالي شخصي ذكي داخل تطبيق "ميزان". أجب بالعربية الواضحة والمختصرة والعملية (بلهجة طبيعية ومباشرة بدون حشو). اعتمد حصرياً على أرقام المستخدم الحقيقية التالية ولا تخترع أي أرقام غير موجودة:\n${JSON.stringify(contextPayload)}`;
+
+  const recentHistory = state.aiChat.slice(-6).map((m) => ({
+    role: m.role === 'user' ? 'user' : 'model',
+    parts: [{ text: m.text }]
+  }));
 
   try {
     const res = await fetch(
@@ -242,9 +298,8 @@ export async function askAdvisor(question) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [
-            { role: 'user', parts: [{ text: `${systemPrompt}\n\nسؤال المستخدم: ${question}` }] }
-          ]
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          contents: [...recentHistory, { role: 'user', parts: [{ text: question }] }]
         })
       }
     );
